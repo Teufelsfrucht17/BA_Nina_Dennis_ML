@@ -47,8 +47,9 @@ for t in TICKERS:
     sheets[t] = df
 
 # Eine Excel-Datei mit je einem Sheet pro Aktie speichern
-out_path = "mag7_1m_last8d.xlsx"
+out_path = "testtageperiode1.xlsx"
 with pd.ExcelWriter(out_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss") as writer:
     for t, d in sheets.items():
         d.to_excel(writer, index=False, sheet_name=t[:31])
 print(f"✅ Gesamtdatei gespeichert: {out_path} (Sheets: {', '.join(sheets.keys())})")
+

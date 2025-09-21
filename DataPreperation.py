@@ -7,15 +7,19 @@ import numpy as np
 
 def dataReader(ticker) -> pd.DataFrame:
 
-    dataprep = pd.read_excel("mag7_1m_last8d.xlsx", sheet_name=ticker)
+    for ticker in ticker:
 
-    print (dataprep.head)
+        dataprep = pd.read_excel("testtageperiode.xlsx", sheet_name=ticker)
 
-    dataprep = dataprep.drop(columns=["close","open","high","low","ticker"])
+        print (dataprep.head)
 
-    dataprep = dataprep.sort_values("date").reset_index(drop=True)
+        dataprep = dataprep.drop(columns=["close","open","high","low","ticker"])
 
-    dataprep.to_csv(str(ticker+".csv"), index=False)
+        dataprep = dataprep.sort_values("date").reset_index(drop=True)
+
+        dataprep.to_csv(str(ticker+".csv"), index=False)
+
+
 
 
 
@@ -46,6 +50,8 @@ def featureEnegnier(ticker) -> pd.DataFrame:
 
 
 
+
+
     return dataLabel
 
 def featuresplit (ticker):
@@ -63,5 +69,7 @@ def featuresplit (ticker):
     Y = dataSplit["Y"]
 
     return X,Y
+
+
 
 
