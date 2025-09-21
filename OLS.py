@@ -1,6 +1,6 @@
 
 import GloablVariableStorage
-from DataPreperation import featuresplit
+from DataPreperation import featuresplit, combine
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
@@ -9,7 +9,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 
 def OLSRegression(ticker):
-    X,Y = featuresplit(ticker)
+    X,Y = combine(ticker)
 
 
     X_train_OLS, X_test_OLS, Y_train_OLS, Y_test_OLS = train_test_split(X,Y, test_size=0.2, random_state=42)
@@ -33,5 +33,4 @@ def OLSRegression(ticker):
 
 
 
-for ticker in GloablVariableStorage.ListofStock :
-    OLSRegression(ticker)
+OLSRegression(GloablVariableStorage.ListofStock)

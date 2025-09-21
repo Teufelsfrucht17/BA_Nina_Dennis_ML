@@ -7,17 +7,17 @@ import numpy as np
 
 def dataReader(ticker) -> pd.DataFrame:
 
-    for ticker in ticker:
 
-        dataprep = pd.read_excel("testtageperiode.xlsx", sheet_name=ticker)
 
-        print (dataprep.head)
+    dataprep = pd.read_excel("testtageperiode.xlsx", sheet_name=ticker)
 
-        dataprep = dataprep.drop(columns=["close","open","high","low","ticker"])
+    print (dataprep.head)
 
-        dataprep = dataprep.sort_values("date").reset_index(drop=True)
+    dataprep = dataprep.drop(columns=["close","open","high","low","ticker"])
 
-        dataprep.to_csv(str(ticker+".csv"), index=False)
+    dataprep = dataprep.sort_values("date").reset_index(drop=True)
+
+    dataprep.to_csv(str(ticker+".csv"), index=False)
 
 
 
@@ -47,6 +47,17 @@ def featureEnegnier(ticker) -> pd.DataFrame:
     dataLabel["vol_mean_20"] = dataLabel["volume"].rolling(20).mean()
     dataLabel["turnover"] = dataLabel["volume"]/ (dataLabel["vol_mean_20"] + 1e-9)
 
+    TRADING_DAYS_PER_YEAR = 252
+    lookbacks = {
+        "mom_3m": int(TRADING_DAYS_PER_YEAR * 3 / 12),  # ~63
+        "mom_1y": TRADING_DAYS_PER_YEAR,  # ~252
+        "mom_5y": TRADING_DAYS_PER_YEAR * 5,  # ~1260
+        "mom_10y": TRADING_DAYS_PER_YEAR * 10,  # ~2520
+    }
+    for name, lb in lookbacks.items():
+        if lb > 0:
+            dataLabel[name] = dataLabel["adj_close"].pct_change(lb)
+
 
 
 
@@ -60,7 +71,7 @@ def featuresplit (ticker):
 
     dataSplit["Y"] = dataSplit["adj_close"].pct_change(5).shift(5)
 
-    features = ["ret_1m", "ret_3m", "sma_gap", "turnover"]
+    features = ["ret_1m", "ret_3m", "sma_gap", "turnover","mom_3m", "mom_1y", "mom_5y","mom_10y"]
 
     dataSplit = dataSplit.dropna(subset=features+["Y"]).reset_index(drop=True)
 
@@ -71,5 +82,23 @@ def featuresplit (ticker):
     return X,Y
 
 
+def combine(tickers):
+    X_list, Y_list = [], []
 
+    for t in tickers:
+        Xcom, Ycom = featuresplit(t)   # Xcom: DataFrame, Ycom: Series
+        Xcom = Xcom.copy()
+      #Xcom["ticker"] = t             # optional: Herkunft behalten
+        Ycom = Ycom.rename("Y")        # saubere Series-Column
 
+        X_list.append(Xcom)
+        Y_list.append(Ycom)
+
+    X_all = pd.concat(X_list, axis=0, ignore_index=True)
+    Y_all = pd.concat(Y_list, axis=0, ignore_index=True)
+
+    X_all.to_csv("X.csv", index=False)
+    Y_all.to_csv("Y.csv", index=False)
+    return X_all, Y_all
+
+print(combine(["AAPL", "MSFT"]))
