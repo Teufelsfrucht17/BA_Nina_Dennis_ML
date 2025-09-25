@@ -5,11 +5,11 @@ import numpy as np
 
 
 
-def dataReader(ticker) -> pd.DataFrame:
+def dataReader(ticker,exclesheet) -> pd.DataFrame:
 
 
 
-    dataprep = pd.read_excel("testtageperiode.xlsx", sheet_name=ticker)
+    dataprep = pd.read_excel(exclesheet, sheet_name=ticker)
 
     print (dataprep.head)
 
@@ -25,13 +25,13 @@ def dataReader(ticker) -> pd.DataFrame:
 
     return dataprep
 
-
+dataReader(ticker="AAPL",exclesheet="mag7_1m_last8d.xlsx")
 
 
 
 def featureEnegnier(ticker) -> pd.DataFrame:
 
-    dataLabel = pd.DataFrame(dataReader(ticker))
+    dataLabel = pd.DataFrame(dataReader(ticker,"testtageperiode.xlsx"))
 
     # Returnes 1m und 3m
 
@@ -57,13 +57,29 @@ def featureEnegnier(ticker) -> pd.DataFrame:
     for name, lb in lookbacks.items():
         if lb > 0:
             dataLabel[name] = dataLabel["adj_close"].pct_change(lb)
-
-
-
-
-
-
     return dataLabel
+
+
+def add_intraday_features(ticker) -> pd.DataFrame:
+    intra = dataReader(ticker,"mag7_1m_last8d.xlsx")
+
+    intra = intra.sort_values(["ticker","date"]).copy()
+    g = intra.groupby("ticker")
+    intra["ret_1"] = g["adj_close"].pct_change(1)
+    intra["ret_3"] = g["adj_close"].pct_change(3)
+    sma = g["adj_close"].transform(lambda s: s.rolling(20).mean())
+    intra["sma_gap"] = intra["adj_close"]/sma - 1
+    volm = g["volume"].transform(lambda s: s.rolling(20).mean())
+    intra["turnover"] = intra["volume"]/(volm + 1e-9)
+    # Label: z. B. 5-Min Zukunftsrendite
+    intra["y"] = g["adj_close"].pct_change(5).shift(-5)
+    return intra
+
+print(add_intraday_features("AAPL").head())
+
+
+
+
 
 def featuresplit (ticker):
 
