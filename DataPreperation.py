@@ -1,3 +1,5 @@
+from csv import excel
+
 import pandas as pd
 import numpy as np
 
@@ -11,7 +13,7 @@ def dataReader(ticker,exclesheet) -> pd.DataFrame:
 
     dataprep = pd.read_excel(exclesheet, sheet_name=ticker)
 
-    print (dataprep.head)
+    print(dataprep.head())
 
     dataprep = dataprep.drop(columns=["close","open","high","low","ticker"])
 
@@ -60,32 +62,92 @@ def featureEnegnier(ticker) -> pd.DataFrame:
     return dataLabel
 
 
-def add_intraday_features(ticker) -> pd.DataFrame:
-    intra = dataReader(ticker,"mag7_1m_last8d.xlsx")
 
-    intra = intra.sort_values(["ticker","date"]).copy()
-    g = intra.groupby("ticker")
-    intra["ret_1"] = g["adj_close"].pct_change(1)
-    intra["ret_3"] = g["adj_close"].pct_change(3)
-    sma = g["adj_close"].transform(lambda s: s.rolling(20).mean())
-    intra["sma_gap"] = intra["adj_close"]/sma - 1
-    volm = g["volume"].transform(lambda s: s.rolling(20).mean())
-    intra["turnover"] = intra["volume"]/(volm + 1e-9)
-    # Label: z. B. 5-Min Zukunftsrendite
-    intra["y"] = g["adj_close"].pct_change(5).shift(-5)
-    return intra
 
-print(add_intraday_features("AAPL").head())
 
+def initilizedayliy(ticker):
+
+    dataLabel = pd.DataFrame(dataReader(ticker,"mag7_1m_last8d.xlsx"))
+
+    # Returnes 1m und 3m
+
+    dataLabel["ret_1m"] = dataLabel["adj_close"].pct_change(1)
+    dataLabel["ret_3m"] = dataLabel["adj_close"].pct_change(3)
+
+    # Moving Average Gap
+    dataLabel["sma_20"] = dataLabel["adj_close"].rolling(20).mean()
+    dataLabel["sma_gap"] = dataLabel["adj_close"] / dataLabel["sma_20"]-1
+
+    # volume Feature
+
+    dataLabel["vol_mean_20"] = dataLabel["volume"].rolling(20).mean()
+    dataLabel["turnover"] = dataLabel["volume"]/ (dataLabel["vol_mean_20"] + 1e-9)
+
+    TRADING_DAYS_PER_YEAR = 252
+    lookbacks = {
+        "mom_3m": int(TRADING_DAYS_PER_YEAR * 3 / 12),  # ~63
+        "mom_1y": TRADING_DAYS_PER_YEAR,  # ~252
+        "mom_5y": TRADING_DAYS_PER_YEAR * 5,  # ~1260
+        "mom_10y": TRADING_DAYS_PER_YEAR * 10,  # ~2520
+    }
+    for name, lb in lookbacks.items():
+        if lb > 0:
+            dataLabel[name] = dataLabel["adj_close"].pct_change(lb)
+    return dataLabel
+
+print(initilizedayliy("AAPL"))
+
+
+def addIntraday(ticker):
+    """Kombiniert Daily-Langfrist-Signale mit Intraday-Features (1m)."""
+
+    # 1) Langfristige Features (Daily, 10 Jahre)
+    daily = featureEnegnier(ticker).copy()
+    daily.rename(columns={"Datetime": "date", "Date": "date"}, inplace=True)
+    daily["date"] = pd.to_datetime(daily["date"], errors="coerce").dt.tz_localize(None)
+    daily = daily.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+
+    # Nur Spalten behalten, die du intraday mappen willst
+    daily_keep = ["date", "mom_3m", "mom_1y", "mom_5y", "mom_10y"]
+    daily_feat = daily[daily_keep].dropna().sort_values("date")
+
+    # 2) Intraday-Daten laden (8 Tage, 1m)
+    intra = pd.read_excel("mag7_1m_last8d.xlsx", sheet_name=ticker).copy()
+    intra.rename(columns={"Datetime": "date", "Date": "date"}, inplace=True)
+    intra["date"] = pd.to_datetime(intra["date"], errors="coerce").dt.tz_localize(None)
+    if "ticker" not in intra.columns:
+        intra["ticker"] = ticker
+    intra = intra.dropna(subset=["date"]).sort_values(["ticker", "date"]).reset_index(drop=True)
+
+    # Intraday-Features
+    g = intra.groupby("ticker", group_keys=False)
+    intra["ret_1m"] = g["adj_close"].pct_change(1)
+    intra["ret_3m"] = g["adj_close"].pct_change(3)
+    intra["sma_20"] = g["adj_close"].apply(lambda s: s.rolling(20).mean())
+    intra["sma_gap"] = intra["adj_close"] / intra["sma_20"] - 1
+    intra["vol_mean_20"] = g["volume"].apply(lambda s: s.rolling(20).mean())
+    intra["turnover"] = intra["volume"] / (intra["vol_mean_20"] + 1e-9)
+
+    # 3) Daily auf Intraday joinen (zuletzt verfügbares Datum, kein Lookahead)
+    merged = pd.merge_asof(
+        intra.sort_values("date"),
+        daily_feat.sort_values("date"),
+        on="date",
+        direction="backward"
+    )
+
+    return merged
 
 
 
 
 def featuresplit (ticker):
 
-    dataSplit = pd.DataFrame(featureEnegnier(ticker))
+    dataSplit = pd.DataFrame(initilizedayliy(ticker))
 
-    dataSplit["Y"] = dataSplit["adj_close"].pct_change(5).shift(5)
+    dataSplit.to_excel("split.xlsx", index=False)
+
+    dataSplit["Y"] = dataSplit["adj_close"].pct_change(5).shift(-5)
 
     features = ["ret_1m", "ret_3m", "sma_gap", "turnover","mom_3m", "mom_1y", "mom_5y","mom_10y"]
 
