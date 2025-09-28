@@ -143,7 +143,7 @@ def addIntraday(ticker):
 
 def featuresplit (ticker):
 
-    dataSplit = pd.DataFrame(initilizedayliy(ticker))
+    dataSplit = pd.DataFrame(featureEnegnier(ticker))
 
     dataSplit.to_excel("split.xlsx", index=False)
 
