@@ -32,4 +32,4 @@ def OLSRegression(ticker):
 
 
 
-OLSRegression(GloablVariableStorage.ListofStock)
+OLSRegression(["NVDA","MSFT"])

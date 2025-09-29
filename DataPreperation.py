@@ -19,7 +19,7 @@ def dataReader(ticker,exclesheet) -> pd.DataFrame:
 
     dataprep = dataprep.sort_values("date").reset_index(drop=True)
 
-    dataprep.to_csv(str(ticker+".csv"), index=False)
+    dataprep.to_csv(str("DataStorage/"+ticker+".csv"), index=False)
 
 
 
@@ -27,13 +27,13 @@ def dataReader(ticker,exclesheet) -> pd.DataFrame:
 
     return dataprep
 
-dataReader(ticker="AAPL",exclesheet="mag7_1m_last8d.xlsx")
+abc = dataReader(ticker="AAPL",exclesheet="DataStorage/mag7_1m_last8d.xlsx")
 
-
+print(abc.head())
 
 def featureEnegnier(ticker) -> pd.DataFrame:
 
-    dataLabel = pd.DataFrame(dataReader(ticker,"testtageperiode.xlsx"))
+    dataLabel = pd.DataFrame(dataReader(ticker,"DataStorage/testtageperiode.xlsx"))
 
     # Returnes 1m und 3m
 
@@ -67,7 +67,7 @@ def featureEnegnier(ticker) -> pd.DataFrame:
 
 def initilizedayliy(ticker):
 
-    dataLabel = pd.DataFrame(dataReader(ticker,"mag7_1m_last8d.xlsx"))
+    dataLabel = pd.DataFrame(dataReader(ticker,"DataStorage/mag7_1m_last8d.xlsx"))
 
     # Returnes 1m und 3m
 
@@ -88,7 +88,7 @@ def initilizedayliy(ticker):
         "mom_3m": int(TRADING_DAYS_PER_YEAR * 3 / 12),  # ~63
         "mom_1y": TRADING_DAYS_PER_YEAR,  # ~252
         "mom_5y": TRADING_DAYS_PER_YEAR * 5,  # ~1260
-        "mom_10y": TRADING_DAYS_PER_YEAR * 10,  # ~2520
+       # "mom_10y": TRADING_DAYS_PER_YEAR * 10,  # ~2520
     }
     for name, lb in lookbacks.items():
         if lb > 0:
@@ -112,7 +112,7 @@ def addIntraday(ticker):
     daily_feat = daily[daily_keep].dropna().sort_values("date")
 
     # 2) Intraday-Daten laden (8 Tage, 1m)
-    intra = pd.read_excel("mag7_1m_last8d.xlsx", sheet_name=ticker).copy()
+    intra = pd.read_excel("DataStorage/mag7_1m_last8d.xlsx", sheet_name=ticker).copy()
     intra.rename(columns={"Datetime": "date", "Date": "date"}, inplace=True)
     intra["date"] = pd.to_datetime(intra["date"], errors="coerce").dt.tz_localize(None)
     if "ticker" not in intra.columns:
@@ -145,11 +145,13 @@ def featuresplit (ticker):
 
     dataSplit = pd.DataFrame(featureEnegnier(ticker))
 
-    dataSplit.to_excel("split.xlsx", index=False)
+    dataSplit = dataSplit.drop(columns=["mom_10y"])
+
+    dataSplit.to_excel("DataStorage/split.xlsx", index=False)
 
     dataSplit["Y"] = dataSplit["adj_close"].pct_change(5).shift(-5)
 
-    features = ["ret_1m", "ret_3m", "sma_gap", "turnover","mom_3m", "mom_1y", "mom_5y","mom_10y"]
+    features = ["ret_1m", "ret_3m", "sma_gap", "turnover","mom_3m", "mom_1y"]
 
     dataSplit = dataSplit.dropna(subset=features+["Y"]).reset_index(drop=True)
 
@@ -175,8 +177,8 @@ def combine(tickers):
     X_all = pd.concat(X_list, axis=0, ignore_index=True)
     Y_all = pd.concat(Y_list, axis=0, ignore_index=True)
 
-    X_all.to_csv("X.csv", index=False)
-    Y_all.to_csv("Y.csv", index=False)
+    X_all.to_csv("DataStorage/X.csv", index=False)
+    Y_all.to_csv("DataStorage/Y.csv", index=False)
     return X_all, Y_all
 
 print(combine(["AAPL", "MSFT"]))
