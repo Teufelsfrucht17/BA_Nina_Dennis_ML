@@ -41,7 +41,7 @@ def OLSRegression(ticker):
         ("scaler", StandardScaler()),
         ("ridge", Ridge())
     ])
-    param_grid = {"ridge__alpha": [1e-4, 1e-3, 1e-2, 1e-1, 1, 10]}
+    param_grid = {"ridge__alpha": [1e-4, 1e-3, 1e-2, 1e-1, 1, 10,20,100,1000,10000,100000]}
     CV_ridge = GridSearchCV(estimator=pipe, param_grid=param_grid, cv=5)
     CV_ridge.fit(X_train, Y_train)
 

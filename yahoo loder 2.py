@@ -1,14 +1,17 @@
 import yfinance as yf
 import pandas as pd
 
-def downlaod_MAg7():
+import GloablVariableStorage
+
+
+def downlaod_ticker(ticker,period,interval):
     # Dictionary to collect DataFrames for each ticker
     sheets = {}
 
     # Magnificent 7 Ticker
-    TICKERS = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA"]
-    PERIOD = "8d"
-    INTERVAL = "1m"
+    TICKERS = ticker
+    PERIOD = period
+    INTERVAL = interval
 
     for t in TICKERS:
         df = yf.download(
@@ -54,3 +57,15 @@ def downlaod_MAg7():
             d.to_excel(writer, index=False, sheet_name=t[:31])
     print(f"✅ Gesamtdatei gespeichert: {out_path} (Sheets: {', '.join(sheets.keys())})")
 
+#downlaod_ticker(GloablVariableStorage.ListofStock,"8d","1m")
+
+def dowload_Index(ticker, period,interval):
+    df = yf.download(ticker, period=period, auto_adjust=True,interval=interval)
+    df = df.reset_index()[["Date", "Close", "Volume"]]
+    df.rename(columns={"Date": "date", "Close": "adj_close", "Volume": "volume"}, inplace=True)
+    path = "DataStorage/" + ticker + ".csv"
+    df.to_csv(path, index=False)
+    print(f"Benchmark gespeichert als {path}")
+
+
+dowload_Index("SPY","10y","1d")
