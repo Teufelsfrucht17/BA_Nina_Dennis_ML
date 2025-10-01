@@ -4,14 +4,16 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
+BENCHMARK_PATH = Path("DataStorage/SPY.csv")
+VIX_PATH = Path("DataStorage/VIX.csv")
+
 
 def load_benchmark() -> pd.DataFrame:
     """Lädt Benchmark (z. B. SPY) und berechnet Tagesrenditen."""
-    path = Path("DataStorage/SPY.csv")
-    if not path.exists():
+    if not BENCHMARK_PATH.exists():
         return pd.DataFrame({"date": [], "bench_ret_1d": []})
 
-    benchmark = pd.read_csv(path, parse_dates=["date"])
+    benchmark = pd.read_csv(BENCHMARK_PATH, parse_dates=["date"])
     benchmark = benchmark[pd.to_numeric(benchmark["adj_close"], errors="coerce").notna()].copy()
     benchmark["adj_close"] = pd.to_numeric(benchmark["adj_close"], errors="coerce")
     if "volume" in benchmark.columns:
@@ -19,6 +21,31 @@ def load_benchmark() -> pd.DataFrame:
     benchmark = benchmark.sort_values("date").reset_index(drop=True)
     benchmark["bench_ret_1d"] = benchmark["adj_close"].pct_change(1)
     return benchmark[["date", "bench_ret_1d"]]
+
+
+def load_vix() -> pd.DataFrame:
+    """Lädt VIX-Daten und berechnet Level sowie Tagesrendite."""
+    if not VIX_PATH.exists():
+        return pd.DataFrame({"date": [], "vix_level": [], "vix_ret_1d": []})
+
+    vix = pd.read_csv(VIX_PATH, parse_dates=["date"])
+    vix = vix.sort_values("date").reset_index(drop=True)
+
+    level = None
+    for col in ["adj_close", "Adj Close", "close", "Close", "vix_close"]:
+        if col in vix.columns:
+            level = pd.to_numeric(vix[col], errors="coerce")
+            break
+    if level is None:
+        level = pd.to_numeric(vix.iloc[:, 1], errors="coerce")
+
+    vix_df = pd.DataFrame({
+        "date": vix["date"],
+        "vix_level": level,
+    })
+    vix_df = vix_df.dropna(subset=["vix_level"]).reset_index(drop=True)
+    vix_df["vix_ret_1d"] = vix_df["vix_level"].pct_change(1)
+    return vix_df
 
 
 def dataReader(ticker, exclesheet) -> pd.DataFrame:
@@ -71,6 +98,16 @@ def featureEnegnier(ticker) -> pd.DataFrame:
     dataLabel["beta_60"] = dataLabel["beta_60"].fillna(0)
     dataLabel["alpha_60"] = dataLabel["alpha_60"].fillna(0)
 
+    vix = load_vix()
+    if not vix.empty:
+        dataLabel = dataLabel.merge(vix, on="date", how="left")
+        dataLabel["vix_level"] = dataLabel["vix_level"].fillna(method="ffill")
+        dataLabel["vix_level"] = dataLabel["vix_level"].fillna(dataLabel["vix_level"].median())
+        dataLabel["vix_ret_1d"] = dataLabel["vix_ret_1d"].fillna(0)
+    else:
+        dataLabel["vix_level"] = 0.0
+        dataLabel["vix_ret_1d"] = 0.0
+
     return dataLabel
 
 
@@ -83,10 +120,9 @@ def initilizedayliy(ticker):
 
     TRADING_DAYS_PER_YEAR = 252
     lookbacks = {
-        "mom_3m": int(TRADING_DAYS_PER_YEAR * 3 / 12),  # ~63
-        "mom_1y": TRADING_DAYS_PER_YEAR,  # ~252
-        "mom_5y": TRADING_DAYS_PER_YEAR * 5,  # ~1260
-        "mom_10y": TRADING_DAYS_PER_YEAR * 10,  # ~2520
+        "mom_3m": int(TRADING_DAYS_PER_YEAR * 3 / 12),
+        "mom_1y": TRADING_DAYS_PER_YEAR,
+        "mom_5y": TRADING_DAYS_PER_YEAR * 5,
     }
     for name, lb in lookbacks.items():
         if lb > 0:
@@ -150,6 +186,8 @@ def featuresplit(ticker):
         "bench_ret_1d",
         "beta_60",
         "alpha_60",
+        "vix_level",
+        "vix_ret_1d",
     ]
 
     dataSplit = dataSplit.dropna(subset=features + ["Y"]).reset_index(drop=True)
@@ -164,10 +202,10 @@ def combine(tickers):
     X_list, Y_list = [], []
 
     for t in tickers:
-        Xcom, Ycom = featuresplit(t)   # Xcom: DataFrame, Ycom: Series
+        Xcom, Ycom = featuresplit(t)
         Xcom = Xcom.copy()
-        Xcom["ticker"] = t             # optional: Herkunft behalten
-        Ycom = Ycom.rename("Y")        # saubere Series-Column
+        Xcom["ticker"] = t
+        Ycom = Ycom.rename("Y")
 
         X_list.append(Xcom)
         Y_list.append(Ycom)

@@ -68,4 +68,5 @@ def dowload_Index(ticker, period,interval):
     print(f"Benchmark gespeichert als {path}")
 
 
-dowload_Index("SPY","10y","1d")
+#dowload_Index("SPY","10y","1d")
+dowload_Index("^VIX","10y","1d")
