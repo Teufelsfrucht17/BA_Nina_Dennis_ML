@@ -27,10 +27,6 @@ def dataReader(ticker,exclesheet) -> pd.DataFrame:
 
     return dataprep
 
-abc = dataReader(ticker="AAPL",exclesheet="DataStorage/mag7_1m_last8d.xlsx")
-
-print(abc.head())
-
 def featureEnegnier(ticker) -> pd.DataFrame:
 
     dataLabel = pd.DataFrame(dataReader(ticker,"DataStorage/testtageperiode.xlsx"))
@@ -74,28 +70,21 @@ def initilizedayliy(ticker):
     dataLabel["ret_1m"] = dataLabel["adj_close"].pct_change(1)
     dataLabel["ret_3m"] = dataLabel["adj_close"].pct_change(3)
 
-    # Moving Average Gap
-    dataLabel["sma_20"] = dataLabel["adj_close"].rolling(20).mean()
-    dataLabel["sma_gap"] = dataLabel["adj_close"] / dataLabel["sma_20"]-1
 
     # volume Feature
 
-    dataLabel["vol_mean_20"] = dataLabel["volume"].rolling(20).mean()
-    dataLabel["turnover"] = dataLabel["volume"]/ (dataLabel["vol_mean_20"] + 1e-9)
 
     TRADING_DAYS_PER_YEAR = 252
     lookbacks = {
         "mom_3m": int(TRADING_DAYS_PER_YEAR * 3 / 12),  # ~63
         "mom_1y": TRADING_DAYS_PER_YEAR,  # ~252
         "mom_5y": TRADING_DAYS_PER_YEAR * 5,  # ~1260
-       # "mom_10y": TRADING_DAYS_PER_YEAR * 10,  # ~2520
+        "mom_10y": TRADING_DAYS_PER_YEAR * 10,  # ~2520
     }
     for name, lb in lookbacks.items():
         if lb > 0:
             dataLabel[name] = dataLabel["adj_close"].pct_change(lb)
     return dataLabel
-
-print(initilizedayliy("AAPL"))
 
 
 def addIntraday(ticker):
@@ -145,13 +134,20 @@ def featuresplit (ticker):
 
     dataSplit = pd.DataFrame(featureEnegnier(ticker))
 
-    dataSplit = dataSplit.drop(columns=["mom_10y"])
-
     dataSplit.to_excel("DataStorage/split.xlsx", index=False)
 
     dataSplit["Y"] = dataSplit["adj_close"].pct_change(5).shift(-5)
 
-    features = ["ret_1m", "ret_3m", "sma_gap", "turnover","mom_3m", "mom_1y"]
+    features = [
+        "ret_1m",
+        "ret_3m",
+        "sma_gap",
+        "turnover",
+        "mom_3m",
+        "mom_1y",
+        "mom_5y",
+        "mom_10y",
+    ]
 
     dataSplit = dataSplit.dropna(subset=features+["Y"]).reset_index(drop=True)
 
@@ -168,13 +164,17 @@ def combine(tickers):
     for t in tickers:
         Xcom, Ycom = featuresplit(t)   # Xcom: DataFrame, Ycom: Series
         Xcom = Xcom.copy()
-      #Xcom["ticker"] = t             # optional: Herkunft behalten
+        Xcom["ticker"] = t             # optional: Herkunft behalten
         Ycom = Ycom.rename("Y")        # saubere Series-Column
 
         X_list.append(Xcom)
         Y_list.append(Ycom)
 
     X_all = pd.concat(X_list, axis=0, ignore_index=True)
+    if "ticker" in X_all.columns:
+        ticker_dummies = pd.get_dummies(X_all.pop("ticker"), prefix="ticker")
+        X_all = pd.concat([X_all, ticker_dummies], axis=1)
+
     Y_all = pd.concat(Y_list, axis=0, ignore_index=True)
 
     X_all.to_csv("DataStorage/X.csv", index=False)

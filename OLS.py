@@ -16,7 +16,7 @@ def OLSRegression(ticker):
     param_grid = {'fit_intercept': [True, False]}
     # Set model specs
     ols_model = LinearRegression()
-    CV_olsmodel = GridSearchCV(estimator=ols_model, param_grid=param_grid, cv=10)
+    CV_olsmodel = GridSearchCV(estimator=ols_model, param_grid=param_grid, cv=10,n_jobs=-1)
     CV_olsmodel.fit(X_train_OLS, Y_train_OLS)
 
     # Prediction and result
@@ -32,4 +32,6 @@ def OLSRegression(ticker):
 
 
 
-OLSRegression(["NVDA","MSFT"])
+OLSRegression(GloablVariableStorage.ListofStock)
+
+
