@@ -1,8 +1,8 @@
 from csv import excel
 from pathlib import Path
-
 import pandas as pd
 import numpy as np
+import GloablVariableStorage
 
 BENCHMARK_PATH = Path("DataStorage/SPY.csv")
 VIX_PATH = Path("DataStorage/VIX.csv")
@@ -65,7 +65,7 @@ def dataReader(ticker, exclesheet) -> pd.DataFrame:
 
 def featureEnegnier(ticker) -> pd.DataFrame:
 
-    dataLabel = pd.DataFrame(dataReader(ticker, "DataStorage/testtageperiode.xlsx"))
+    dataLabel = pd.DataFrame(dataReader(ticker, "DataStorage/Mag7.xlsx"))
 
     dataLabel["ret_1m"] = dataLabel["adj_close"].pct_change(1)
     dataLabel["ret_3m"] = dataLabel["adj_close"].pct_change(3)
@@ -190,15 +190,16 @@ def featuresplit(ticker):
         "vix_ret_1d",
     ]
 
-    dataSplit = dataSplit.dropna(subset=features + ["Y"]).reset_index(drop=True)
-
     X = dataSplit[features]
     Y = dataSplit["Y"]
+
+   # X.to_csv("DataStorage/X_test.csv", index=False)
+    #Y.to_csv("DataStorage/Y_test.csv", index=False)
 
     return X, Y
 
 
-def combine(tickers):
+def combine1(tickers):
     X_list, Y_list = [], []
 
     for t in tickers:
@@ -222,4 +223,4 @@ def combine(tickers):
     return X_all, Y_all
 
 
-print(combine(["AAPL", "MSFT"]))
+print(combine1(GloablVariableStorage.ListofStock))

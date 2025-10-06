@@ -4,7 +4,7 @@ import pandas as pd
 import GloablVariableStorage
 
 
-def downlaod_ticker(ticker,period,interval):
+def downlaod_ticker(ticker,period,interval,nameofexcle):
     # Dictionary to collect DataFrames for each ticker
     sheets = {}
 
@@ -51,13 +51,13 @@ def downlaod_ticker(ticker,period,interval):
         sheets[t] = df
 
     # Eine Excel-Datei mit je einem Sheet pro Aktie speichern
-    out_path = "DataStorage/testtageperiode1.xlsx"
+    out_path = "DataStorage/"+nameofexcle+".xlsx"
     with pd.ExcelWriter(out_path, engine="xlsxwriter", datetime_format="yyyy-mm-dd hh:mm:ss") as writer:
         for t, d in sheets.items():
             d.to_excel(writer, index=False, sheet_name=t[:31])
     print(f"✅ Gesamtdatei gespeichert: {out_path} (Sheets: {', '.join(sheets.keys())})")
 
-#downlaod_ticker(GloablVariableStorage.ListofStock,"8d","1m")
+downlaod_ticker(GloablVariableStorage.ListofStock,"10y","1d","Mag7")
 
 def dowload_Index(ticker, period,interval):
     df = yf.download(ticker, period=period, auto_adjust=True,interval=interval)
@@ -69,4 +69,4 @@ def dowload_Index(ticker, period,interval):
 
 
 #dowload_Index("SPY","10y","1d")
-dowload_Index("^VIX","10y","1d")
+#dowload_Index("^VIX","10y","1d")

@@ -59,4 +59,4 @@ def OLSRegression(ticker):
 
 
 
-OLSRegression(GloablVariableStorage.ListofStock)
+OLSRegression(GloablVariableStorage.LisofStocks_Dow)
