@@ -24,9 +24,4 @@ def getHistoryData(universe : list[str]   , fields: list[str] , start :datetime.
     return df
 
 
-test = getHistoryData(universe= [".GDAXI"],
-                    fields= ["OPEN_PRC"],
-                    start= datetime.datetime(2015, 1, 1),
-                    end= datetime.datetime(2025, 10, 25) ,
-                    interval='30min')
 

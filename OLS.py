@@ -1,3 +1,4 @@
+import DataPreperation
 import GloablVariableStorage
 from DataPreperation import featuresplit, combine
 from sklearn.model_selection import train_test_split, GridSearchCV
@@ -8,7 +9,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 
 def OLSRegression(ticker):
-    X,Y = combine(ticker)
+    X,Y = DataPreperation.combine(ticker)
 
 
     X_train_OLS, X_test_OLS, Y_train_OLS, Y_test_OLS = train_test_split(X,Y, test_size=0.2, random_state=42)
@@ -32,6 +33,10 @@ def OLSRegression(ticker):
 
 
 
-OLSRegression(GloablVariableStorage.LisofStocks_Dow)
+if __name__ == "__main__":
+    try:
+        OLSRegression(GloablVariableStorage.LisofStocks_Dow)
+    except Exception as e:
+        print(f"OLS run failed: {e}")
 
 

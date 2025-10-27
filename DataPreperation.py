@@ -1,226 +1,122 @@
-from csv import excel
 from pathlib import Path
 import pandas as pd
-import numpy as np
+
 import GloablVariableStorage
 
-BENCHMARK_PATH = Path("DataStorage/SPY.csv")
-VIX_PATH = Path("DataStorage/VIX.csv")
+# Very simple defaults: pick the first existing workbook
+_candidates = [
+    Path("DataStorage/Mag7.xlsx"),
+    Path("DataStorage/Dow30.xlsx"),
+]
+DEFAULT_EXCEL = next((p for p in _candidates if p.exists()), _candidates[0])
 
 
-def load_benchmark() -> pd.DataFrame:
-    """Lädt Benchmark (z. B. SPY) und berechnet Tagesrenditen."""
-    if not BENCHMARK_PATH.exists():
-        return pd.DataFrame({"date": [], "bench_ret_1d": []})
+def dataReader(ticker: str, exclesheet: str | Path = DEFAULT_EXCEL) -> pd.DataFrame:
+    """Read a single ticker sheet from an Excel file and return a clean DataFrame.
 
-    benchmark = pd.read_csv(BENCHMARK_PATH, parse_dates=["date"])
-    benchmark = benchmark[pd.to_numeric(benchmark["adj_close"], errors="coerce").notna()].copy()
-    benchmark["adj_close"] = pd.to_numeric(benchmark["adj_close"], errors="coerce")
-    if "volume" in benchmark.columns:
-        benchmark["volume"] = pd.to_numeric(benchmark["volume"], errors="coerce")
-    benchmark = benchmark.sort_values("date").reset_index(drop=True)
-    benchmark["bench_ret_1d"] = benchmark["adj_close"].pct_change(1)
-    return benchmark[["date", "bench_ret_1d"]]
-
-
-def load_vix() -> pd.DataFrame:
-    """Lädt VIX-Daten und berechnet Level sowie Tagesrendite."""
-    if not VIX_PATH.exists():
-        return pd.DataFrame({"date": [], "vix_level": [], "vix_ret_1d": []})
-
-    vix = pd.read_csv(VIX_PATH, parse_dates=["date"])
-    vix = vix.sort_values("date").reset_index(drop=True)
-
-    level = None
-    for col in ["adj_close", "Adj Close", "close", "Close", "vix_close"]:
-        if col in vix.columns:
-            level = pd.to_numeric(vix[col], errors="coerce")
-            break
-    if level is None:
-        level = pd.to_numeric(vix.iloc[:, 1], errors="coerce")
-
-    vix_df = pd.DataFrame({
-        "date": vix["date"],
-        "vix_level": level,
+    Keeps only the essential columns [date, adj_close, volume] if present and sorts by date.
+    """
+    df = pd.read_excel(exclesheet, sheet_name=ticker)
+    # Normalize common column names
+    df = df.rename(columns={
+        "Datetime": "date",
+        "Date": "date",
+        "Adj Close": "adj_close",
+        "AdjClose": "adj_close",
+        "Volume": "volume",
     })
-    vix_df = vix_df.dropna(subset=["vix_level"]).reset_index(drop=True)
-    vix_df["vix_ret_1d"] = vix_df["vix_level"].pct_change(1)
-    return vix_df
+    if "adj_close" not in df.columns:
+        for alt in ["Close", "close"]:
+            if alt in df.columns:
+                df["adj_close"] = df[alt]
+                break
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
+    cols = []
+    if "date" in df.columns:
+        cols.append("date")
+    for c in ["adj_close", "volume"]:
+        if c in df.columns:
+            cols.append(c)
+    if not cols:
+        # nothing recognizable; return the raw frame to avoid KeyErrors
+        return df.reset_index(drop=True)
+
+    df = df[cols]
+    if "date" in df.columns:
+        df = df.dropna(subset=["date"]).sort_values("date")
+    df = df.reset_index(drop=True)
+    return df
 
 
-def dataReader(ticker, exclesheet) -> pd.DataFrame:
+def featureEnegnier(ticker: str, exclesheet: str | Path = DEFAULT_EXCEL) -> pd.DataFrame:
+    """Minimal feature set for a ticker: returns DataFrame with features and date.
 
-    dataprep = pd.read_excel(exclesheet, sheet_name=ticker)
-
-    print(dataprep.head())
-
-    dataprep = dataprep.drop(columns=["close", "open", "high", "low", "ticker"], errors="ignore")
-
-    dataprep = dataprep.sort_values("date").reset_index(drop=True)
-
-    dataprep.to_csv(str("DataStorage/" + ticker + ".csv"), index=False)
-
-    return dataprep
-
-
-def featureEnegnier(ticker) -> pd.DataFrame:
-
-    dataLabel = pd.DataFrame(dataReader(ticker, "DataStorage/Mag7.xlsx"))
-
-    dataLabel["ret_1m"] = dataLabel["adj_close"].pct_change(1)
-    dataLabel["ret_3m"] = dataLabel["adj_close"].pct_change(3)
-
-    dataLabel["sma_20"] = dataLabel["adj_close"].rolling(20).mean()
-    dataLabel["sma_gap"] = dataLabel["adj_close"] / dataLabel["sma_20"] - 1
-
-    dataLabel["vol_mean_20"] = dataLabel["volume"].rolling(20).mean()
-    dataLabel["turnover"] = dataLabel["volume"] / (dataLabel["vol_mean_20"] + 1e-9)
-
-    TRADING_DAYS_PER_YEAR = 252
-    lookbacks = {
-        "mom_3m": int(TRADING_DAYS_PER_YEAR * 3 / 12),
-        "mom_1y": TRADING_DAYS_PER_YEAR,
-        "mom_5y": TRADING_DAYS_PER_YEAR * 5,
-        "mom_10y": TRADING_DAYS_PER_YEAR * 10,
-    }
-    for name, lb in lookbacks.items():
-        if lb > 0:
-            dataLabel[name] = dataLabel["adj_close"].pct_change(lb)
-
-    benchmark = load_benchmark()
-    dataLabel = dataLabel.merge(benchmark, on="date", how="left")
-    dataLabel["bench_ret_1d"] = dataLabel["bench_ret_1d"].fillna(0)
-
-    rolling_cov = dataLabel["ret_1m"].rolling(60).cov(dataLabel["bench_ret_1d"])
-    rolling_var = dataLabel["bench_ret_1d"].rolling(60).var()
-    dataLabel["beta_60"] = rolling_cov / (rolling_var + 1e-9)
-    dataLabel["alpha_60"] = dataLabel["ret_1m"] - dataLabel["beta_60"] * dataLabel["bench_ret_1d"]
-    dataLabel["beta_60"] = dataLabel["beta_60"].fillna(0)
-    dataLabel["alpha_60"] = dataLabel["alpha_60"].fillna(0)
-
-    vix = load_vix()
-    if not vix.empty:
-        dataLabel = dataLabel.merge(vix, on="date", how="left")
-        dataLabel["vix_level"] = dataLabel["vix_level"].fillna(method="ffill")
-        dataLabel["vix_level"] = dataLabel["vix_level"].fillna(dataLabel["vix_level"].median())
-        dataLabel["vix_ret_1d"] = dataLabel["vix_ret_1d"].fillna(0)
-    else:
-        dataLabel["vix_level"] = 0.0
-        dataLabel["vix_ret_1d"] = 0.0
-
-    return dataLabel
+    Features:
+    - ret_1: 1-step return on adj_close
+    - sma_gap: price relative to 20-period SMA
+    - turnover: volume relative to 20-period average volume
+    """
+    d = dataReader(ticker, exclesheet)
+    d = d.copy()
+    d["ret_1"] = d["adj_close"].pct_change(1)
+    d["sma_20"] = d["adj_close"].rolling(20).mean()
+    d["sma_gap"] = d["adj_close"] / d["sma_20"] - 1
+    if "volume" in d.columns:
+        d["vol_mean_20"] = d["volume"].rolling(20).mean()
+        d["turnover"] = d["volume"] / (d["vol_mean_20"] + 1e-9)
+    return d
 
 
-def initilizedayliy(ticker):
+def featuresplit(
+    ticker: str,
+    exclesheet: str | Path = DEFAULT_EXCEL,
+    horizon: int = 5,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Return X, Y for a single ticker using minimal features.
 
-    dataLabel = pd.DataFrame(dataReader(ticker, "DataStorage/mag7_1m_last8d.xlsx"))
-
-    dataLabel["ret_1m"] = dataLabel["adj_close"].pct_change(1)
-    dataLabel["ret_3m"] = dataLabel["adj_close"].pct_change(3)
-
-    TRADING_DAYS_PER_YEAR = 252
-    lookbacks = {
-        "mom_3m": int(TRADING_DAYS_PER_YEAR * 3 / 12),
-        "mom_1y": TRADING_DAYS_PER_YEAR,
-        "mom_5y": TRADING_DAYS_PER_YEAR * 5,
-    }
-    for name, lb in lookbacks.items():
-        if lb > 0:
-            dataLabel[name] = dataLabel["adj_close"].pct_change(lb)
-    return dataLabel
-
-
-def addIntraday(ticker):
-    """Kombiniert Daily-Langfrist-Signale mit Intraday-Features (1m)."""
-
-    daily = featureEnegnier(ticker).copy()
-    daily.rename(columns={"Datetime": "date", "Date": "date"}, inplace=True)
-    daily["date"] = pd.to_datetime(daily["date"], errors="coerce").dt.tz_localize(None)
-    daily = daily.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
-
-    daily_keep = ["date", "mom_3m", "mom_1y", "mom_5y", "mom_10y"]
-    daily_feat = daily[daily_keep].dropna().sort_values("date")
-
-    intra = pd.read_excel("DataStorage/mag7_1m_last8d.xlsx", sheet_name=ticker).copy()
-    intra.rename(columns={"Datetime": "date", "Date": "date"}, inplace=True)
-    intra["date"] = pd.to_datetime(intra["date"], errors="coerce").dt.tz_localize(None)
-    if "ticker" not in intra.columns:
-        intra["ticker"] = ticker
-    intra = intra.dropna(subset=["date"]).sort_values(["ticker", "date"]).reset_index(drop=True)
-
-    g = intra.groupby("ticker", group_keys=False)
-    intra["ret_1m"] = g["adj_close"].pct_change(1)
-    intra["ret_3m"] = g["adj_close"].pct_change(3)
-    intra["sma_20"] = g["adj_close"].apply(lambda s: s.rolling(20).mean())
-    intra["sma_gap"] = intra["adj_close"] / intra["sma_20"] - 1
-    intra["vol_mean_20"] = g["volume"].apply(lambda s: s.rolling(20).mean())
-    intra["turnover"] = intra["volume"] / (intra["vol_mean_20"] + 1e-9)
-
-    merged = pd.merge_asof(
-        intra.sort_values("date"),
-        daily_feat.sort_values("date"),
-        on="date",
-        direction="backward"
-    )
-
-    return merged
-
-
-def featuresplit(ticker):
-
-    dataSplit = pd.DataFrame(featureEnegnier(ticker))
-
-    dataSplit.to_excel("DataStorage/split.xlsx", index=False)
-
-    dataSplit["Y"] = dataSplit["adj_close"].pct_change(5).shift(-5)
-
-    features = [
-        "ret_1m",
-        "ret_3m",
-        "sma_gap",
-        "turnover",
-        "mom_3m",
-        "mom_1y",
-        "mom_5y",
-        "mom_10y",
-        "bench_ret_1d",
-        "beta_60",
-        "alpha_60",
-        "vix_level",
-        "vix_ret_1d",
-    ]
-
-    X = dataSplit[features]
-    Y = dataSplit["Y"]
-
-   # X.to_csv("DataStorage/X_test.csv", index=False)
-    #Y.to_csv("DataStorage/Y_test.csv", index=False)
-
+    Y = future percentage change over 'horizon' periods of adj_close.
+    """
+    df = featureEnegnier(ticker, exclesheet)
+    df["Y"] = df["adj_close"].pct_change(horizon).shift(-horizon)
+    features = [c for c in ["ret_1", "sma_gap", "turnover"] if c in df.columns]
+    out = df.dropna(subset=features + ["Y"])  # simple dropna instead of imputation
+    X = out[features]
+    Y = out["Y"]
     return X, Y
 
 
-def combine1(tickers):
-    X_list, Y_list = [], []
+def combine(
+    tickers: list[str],
+    exclesheet: str | Path = DEFAULT_EXCEL,
+    horizon: int = 5,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Concatenate X, Y across multiple tickers. Adds one-hot ticker dummies."""
+    X_list: list[pd.DataFrame] = []
+    Y_list: list[pd.Series] = []
 
     for t in tickers:
-        Xcom, Ycom = featuresplit(t)
-        Xcom = Xcom.copy()
-        Xcom["ticker"] = t
-        Ycom = Ycom.rename("Y")
+        X_t, Y_t = featuresplit(t, exclesheet, horizon)
+        X_t = X_t.copy()
+        X_t["ticker"] = t
+        X_list.append(X_t)
+        Y_list.append(Y_t.rename("Y"))
 
-        X_list.append(Xcom)
-        Y_list.append(Ycom)
+    if not X_list:
+        return pd.DataFrame(), pd.Series(dtype=float)
 
     X_all = pd.concat(X_list, axis=0, ignore_index=True)
-    if "ticker" in X_all.columns:
-        ticker_dummies = pd.get_dummies(X_all.pop("ticker"), prefix="ticker")
-        X_all = pd.concat([X_all, ticker_dummies], axis=1)
-
     Y_all = pd.concat(Y_list, axis=0, ignore_index=True)
 
-    X_all.to_csv("DataStorage/X.csv", index=False)
-    Y_all.to_csv("DataStorage/Y.csv", index=False)
+    # One-hot encode ticker (kept minimal)
+    if "ticker" in X_all.columns:
+        dummies = pd.get_dummies(X_all.pop("ticker"), prefix="ticker")
+        X_all = pd.concat([X_all, dummies], axis=1)
+
+    print(X_all,Y_all)
     return X_all, Y_all
 
 
-print(combine1(GloablVariableStorage.ListofStock))
+
+combine(GloablVariableStorage.LisofStocks_Dow, DEFAULT_EXCEL, horizon=5)

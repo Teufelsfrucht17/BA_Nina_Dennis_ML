@@ -1,39 +1,6 @@
 # Storing Values In case needed globally
 
-ListofStock = ["AAPL", "GOOGL", "MSFT", "META", "NVDA", "TSLA", "AMZN"]
+Portfolio = ["RHMG.DE","ENR1n.DE","TKAG.DE","FTKn.DE","ACT1.DE","DEZG.DE"]
 
-ListofStocks_Dow = [
-    "AAPL",
-    "AMGN",
-    "AXP",
-    "BA",
-    "CAT",
-    "CRM",
-    "CSCO",
-    "CVX",
-    "DIS",
-    "DOW",
-    "GS",
-    "HD",
-    "HON",
-    "IBM",
-    "INTC",
-    "JNJ",
-    "JPM",
-    "KO",
-    "MCD",
-    "MMM",
-    "MRK",
-    "MSFT",
-    "NKE",
-    "PG",
-    "TRV",
-    "UNH",
-    "V",
-    "VZ",
-    "WBA",
-    "WMT",
-]
+ListofStocks_Dow = []
 
-# Backwards compatibility: older modules use the misspelled name.
-LisofStocks_Dow = ListofStocks_Dow

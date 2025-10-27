@@ -59,4 +59,8 @@ def OLSRegression(ticker):
 
 
 
-OLSRegression(GloablVariableStorage.LisofStocks_Dow)
+if __name__ == "__main__":
+    try:
+        OLSRegression(GloablVariableStorage.LisofStocks_Dow)
+    except Exception as e:
+        print(f"Ridge run failed: {e}")
