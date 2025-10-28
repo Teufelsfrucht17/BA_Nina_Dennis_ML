@@ -4,10 +4,10 @@ from lseg.data.discovery import Chain
 import datetime
 from IPython.display import display, clear_output
 
+import GloablVariableStorage
 
 
-
-def getHistoryData(universe : list[str]   , fields: list[str] , start :datetime.datetime , end : datetime.datetime, interval : str) -> pd.DataFrame:
+def getHistoryData(universe : list[str], fields: list[str] , start :datetime.datetime , end : datetime.datetime, interval : str) -> pd.DataFrame:
     ld.open_session()
 
     df = ld.get_history(
@@ -24,4 +24,4 @@ def getHistoryData(universe : list[str]   , fields: list[str] , start :datetime.
     return df
 
 
-
+test = getHistoryData(universe=GloablVariableStorage.Portfolio ,fields=["OPEN_PRC"], start=datetime.datetime(2015, 1, 1), end=datetime.datetime(2025, 10, 25), interval="30min")
