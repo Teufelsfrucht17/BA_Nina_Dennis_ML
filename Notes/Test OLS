@@ -22,3 +22,8 @@ OLS score = 0.01024406360022112
  und VIX
  OLS score = 0.01223203337455081
 OLS score = 0.010244063600220898
+
+
+
+
+30minReturn(aktie) = alpha + beta1 * 30minDaxReturn + beta2 * 30minVDAX + beta3 * 3moMomentum(stock) + u
