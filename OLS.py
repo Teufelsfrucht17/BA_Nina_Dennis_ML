@@ -1,4 +1,5 @@
 import DataPreperation
+import Dataprep2
 import GloablVariableStorage
 from DataPreperation import featuresplit, combine
 from sklearn.model_selection import train_test_split, GridSearchCV
@@ -8,8 +9,8 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 
 
-def OLSRegression(ticker):
-    X,Y = DataPreperation.combine(ticker)
+def OLSRegression(sheet:int):
+    X,Y = Dataprep2.finalrunner(sheet)
 
 
     X_train_OLS, X_test_OLS, Y_train_OLS, Y_test_OLS = train_test_split(X,Y, test_size=0.2, random_state=42)
@@ -27,15 +28,17 @@ def OLSRegression(ticker):
     r2_train = r2_score(Y_train_OLS, y_train_pred)
     r2_test = r2_score(Y_test_OLS, y_test_pred)
 
-    print("OLS score =", r2_train)
-    print("OLS score =", r2_test)
+    print("Sheet:"+str(sheet)+" OLS score =", r2_train)
+    print("Sheet:"+str(sheet)+" OLS score pseudo =", r2_test)
 
 
 
 
 if __name__ == "__main__":
     try:
-        OLSRegression(GloablVariableStorage.LisofStocks_Dow)
+       for i in range(len(GloablVariableStorage.Portfolio)):
+           OLSRegression(i)
+
     except Exception as e:
         print(f"OLS run failed: {e}")
 

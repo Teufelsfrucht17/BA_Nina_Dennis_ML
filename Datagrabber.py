@@ -63,7 +63,6 @@ def createExcel(
     name: str,
 ) -> None:
     """Daten holen und als Excel speichern (kombiniert + je Aktie eigenes Sheet)."""
-
     df = LS.getHistoryData(
         universe=universe, fields=fields, start=start, end=end, interval=interval )
     exceltextwriter(df, name)
@@ -73,10 +72,10 @@ def createExcel(
 
 
 createExcel(
-    universe= GloablVariableStorage.Portfolio,
+    universe= [".V1XI",".GDAXI"],
     fields=["OPEN_PRC"],
     start=datetime.datetime(2015, 1, 1),
     end=datetime.datetime(2025, 10, 25),
     interval="30min",
-    name="Portfolio",
+    name="INDEX",
 )
