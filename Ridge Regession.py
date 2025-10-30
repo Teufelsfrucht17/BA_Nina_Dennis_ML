@@ -1,14 +1,12 @@
-import numpy as np
 import pandas as pd
-
-from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.linear_model import RidgeClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score
 
-from Dataprep2 import runningcycle, splitdataXY
 import GloablVariableStorage
+from Dataprep2 import runningcycle, splitdataXY
 
 
 def ridge_classification(sheet_index: int) -> None:
@@ -39,7 +37,7 @@ def ridge_classification(sheet_index: int) -> None:
         ("clf", RidgeClassifier())
     ])
     param_grid = {"clf__alpha": [0.1, 1.0, 10.0, 100.0]}
-    grid = GridSearchCV(pipe, param_grid=param_grid, cv=5, scoring="accuracy")
+    grid = GridSearchCV(pipe, param_grid=param_grid, cv=5, scoring="accuracy",n_jobs=-1)
     grid.fit(X_train, y_train)
 
     y_train_pred = grid.predict(X_train)
