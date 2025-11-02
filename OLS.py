@@ -28,8 +28,8 @@ def OLSRegression(sheet:int):
     r2_train = r2_score(Y_train_OLS, y_train_pred)
     r2_test = r2_score(Y_test_OLS, y_test_pred)
 
-    print("Sheet:"+str(sheet)+" OLS score =", r2_train)
-    print("Sheet:"+str(sheet)+" OLS score pseudo =", r2_test)
+    print("Sheet:"+str(sheet)+" in-sample R2 =", r2_train) #in-sample R2
+    print("Sheet:"+str(sheet)+" Out-of-sample R2 =", r2_test) #Out-of-sample R2
 
 
 

@@ -24,4 +24,4 @@ def getHistoryData(universe : list[str], fields: list[str] , start :datetime.dat
     return df
 
 
-test = getHistoryData(universe=GloablVariableStorage.Portfolio ,fields=["OPEN_PRC"], start=datetime.datetime(2015, 1, 1), end=datetime.datetime(2025, 10, 25), interval="30min")
+test = getHistoryData(universe=GloablVariableStorage.Portfolio ,fields=["OPEN_PRC"], start=datetime.datetime(2015, 1, 1), end=datetime.datetime(2025, 11, 1), interval="30min")

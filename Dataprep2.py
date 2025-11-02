@@ -49,8 +49,9 @@ def price_plus_minus(df: pd.DataFrame) -> pd.DataFrame:
     out[price_col] = pd.to_numeric(out[price_col], errors="coerce")
 
     # Änderung zur Vorzeile und 0/1-Signal
-    chg = out[price_col].diff()
-    out["change"] = (chg > 0).astype(int)
+    chg = out[price_col].pct_change(periods=1)
+    out["change"] = chg
+    # out["change"] = (chg > 0).astype(int)  # Hier der Fix für change %
 
     # Debug: erste Zeilen ausgeben
    # print(out.head())
@@ -106,6 +107,9 @@ def runningcycle(sheetstock:int) -> pd.DataFrame:
       #  print(df.head())
     except Exception as e:
         print(f"Fehler beim Verarbeiten: {e}")
+    # Nach dem Mergen sicherheitshalber nach Datum sortieren
+    if "Date" in df.columns:
+        df = df.sort_values("Date").reset_index(drop=True)
     return df
 
 
@@ -127,8 +131,8 @@ def splitdataXY(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     if missing:
         raise ValueError(f"Fehlende Spalten: {missing}. Vorhanden: {list(df.columns)}")
 
-    X = df[["change"]].copy()
-    Y = df[["momentum", "change_dax", "change_vdax"]].copy()
+    Y = df[["change"]].copy()
+    X = df[["momentum", "change_dax", "change_vdax"]].copy()
     return X, Y
 
 
