@@ -110,14 +110,32 @@ def runningcycle(sheetstock:int) -> pd.DataFrame:
     # Nach dem Mergen sicherheitshalber nach Datum sortieren
     if "Date" in df.columns:
         df = df.sort_values("Date").reset_index(drop=True)
+
+    # Zusätzliche abgeleitete Features
+    df["change_lag1"] = df["change"].shift(1)
+    df["change_lag5"] = df["change"].shift(5)
+    df["change_roll_mean5"] = df["change"].rolling(window=5).mean()
+    df["change_roll_std5"] = df["change"].rolling(window=5).std()
+
+    df["momentum_lag1"] = df["momentum"].shift(1)
+
+    for col in ("change_DAX", "change_VDAX"):
+        base = col.lower() if col in df.columns else col
+        if col not in df.columns and base not in df.columns:
+            continue
+        series_name = col if col in df.columns else base
+        df[f"{series_name.lower()}_lag1"] = df[series_name].shift(1)
+        df[f"{series_name.lower()}_roll_mean5"] = df[series_name].rolling(window=5).mean()
+
+    df = df.dropna(how="any").reset_index(drop=True)
     return df
 
 
 def splitdataXY(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Teilt df in X und Y auf.
+    """Teilt df in Featurematrix X und Ziel Y.
 
-    Erwartet die Spalten: 'change', 'momentum', 'change_dax', 'change_vdax'.
-    Akzeptiert auch 'change_DAX'/'change_VDAX' und mappt sie auf lowercase.
+    'change' bleibt als Target, alle übrigen Spalten (außer Datum) bilden X.
+    Groß-/Kleinschreibung bei DAX/VDAX wird harmonisiert.
     """
     df = df.copy()
     # Toleranz für Groß-/Kleinschreibung bei DAX/VDAX
@@ -132,7 +150,11 @@ def splitdataXY(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         raise ValueError(f"Fehlende Spalten: {missing}. Vorhanden: {list(df.columns)}")
 
     Y = df[["change"]].copy()
-    X = df[["momentum", "change_dax", "change_vdax"]].copy()
+
+    # Alle Features außer Ziel und Datum verwenden
+    drop_cols = {"change", "Date", "date"}
+    X_cols = [c for c in df.columns if c not in drop_cols]
+    X = df[X_cols].copy()
     return X, Y
 
 
