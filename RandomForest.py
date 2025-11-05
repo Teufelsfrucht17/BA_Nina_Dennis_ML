@@ -8,6 +8,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 
+import GloablVariableStorage
 from Dataprep2 import finalrunner
 
 
@@ -96,9 +97,9 @@ def train_random_forest(
     return metrics
 
 
-def main():
+def main(sheet: int | None ):
     parser = argparse.ArgumentParser(description="RandomForest-Regressor auf Dataprep2-Daten trainen")
-    parser.add_argument("--sheet", type=int, default=3, help="Sheet-Index (Default: 3)")
+    parser.add_argument("--sheet", type=int, default=sheet, help="Sheet-Index (Default: 3)")
     parser.add_argument("--val_split", type=float, default=0.2, help="Anteil Validierung (Default: 0.2)")
     parser.add_argument("--n_estimators", type=int, default=500, help="Anzahl Bäume (Default: 500)")
     parser.add_argument("--max_depth", type=int, default=None, help="Maximale Tiefe (Default: None)")
@@ -124,4 +125,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        for i in range(len(GloablVariableStorage.Portfolio)):
+            main(i)
+    except Exception as e:
+        print(f"Ridge run failed: {e}")
+
