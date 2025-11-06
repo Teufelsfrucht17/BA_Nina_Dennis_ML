@@ -1,5 +1,6 @@
 import pandas as pd
 from pandas.core.common import random_state
+from rich.diagnose import report
 from sklearn.linear_model import RidgeClassifier,Ridge
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split, GridSearchCV
@@ -12,7 +13,7 @@ import GloablVariableStorage
 import Dataprep2
 
 
-def ridge_classification(sheet_index: int) -> None:
+def ridge_classification(sheet_index: int,report:pd.DataFrame) -> pd.DataFrame:
 
     X, Y = Dataprep2.finalrunner(sheet_index)
 
@@ -46,12 +47,14 @@ def ridge_classification(sheet_index: int) -> None:
     print(f"Sheet {sheet_index}: RidgeClassifier acc test  = {acc_test:.4f}")
     print(f"Sheet {sheet_index}: Best alpha = {grid.best_params_['model__alpha']}")
 
+    return pd.DataFrame.empty
 
-if __name__ == "__main__":
+
+def runRidgeRegession():
     try:
         for i in range(len(GloablVariableStorage.Portfolio)):
-            ridge_classification(i)
+          report = ridge_classification(i)
     except Exception as e:
         print(f"Ridge run failed: {e}")
 
-#ridge_classification(0)
+runRidgeRegession()
