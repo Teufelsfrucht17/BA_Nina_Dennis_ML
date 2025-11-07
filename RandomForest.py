@@ -54,7 +54,7 @@ def train_random_forest(
 ):
     X, y, feature_names = load_xy(sheet)
     X_train, X_val, y_train, y_val = time_series_split(X, y, val_split)
-
+    parm_grid = {   }
     reg = RandomForestRegressor(
         n_estimators=n_estimators,
         max_depth=max_depth,
@@ -62,6 +62,7 @@ def train_random_forest(
         n_jobs=-1,
         random_state=random_state,
     )
+
     reg.fit(X_train, y_train)
 
     y_train_pred = reg.predict(X_train)
@@ -99,7 +100,10 @@ def train_random_forest(
     return metrics
 
 
-def main(sheet: int | None, report: pd.DataFrame | None = None ) -> pd.DataFrame:
+def RF(sheet: int | None, report: pd.DataFrame | None = None) -> pd.DataFrame:
+    if report is None:
+        report = createscore()
+
     parser = argparse.ArgumentParser(description="RandomForest-Regressor auf Dataprep2-Daten trainen")
     parser.add_argument("--sheet", type=int, default=sheet, help="Sheet-Index (Default: 3)")
     parser.add_argument("--val_split", type=float, default=0.2, help="Anteil Validierung (Default: 0.2)")
@@ -110,12 +114,12 @@ def main(sheet: int | None, report: pd.DataFrame | None = None ) -> pd.DataFrame
     parser.add_argument(
         "--model_out",
         type=Path,
-        default=Path("data_output/random_forest.joblib"),
+        default=Path("data_output/ramdom_Forest/random_forest_"+str(sheet)+".joblib"),
         help="Speicherpfad für Modell und Metadaten",
     )
 
     args = parser.parse_args()
-    metric =train_random_forest(
+    metrics = train_random_forest(
         sheet=args.sheet,
         val_split=args.val_split,
         n_estimators=args.n_estimators,
@@ -126,11 +130,11 @@ def main(sheet: int | None, report: pd.DataFrame | None = None ) -> pd.DataFrame
     )
 
     report.loc[len(report)] = [
-        "Ridge",
-        sheet,
-        metric["train_r2"],
-        metric["val_r2"],
-        metric[""],
+        "Random Forest",
+        args.sheet,
+        metrics["train_r2"],
+        metrics["val_r2"],
+        "",
         "N/A",
     ]
     return report
@@ -140,9 +144,8 @@ def Run_RandomForest() -> pd.DataFrame:
     report = createscore()
     try:
         for i in range(len(GloablVariableStorage.Portfolio)):
-            report = main(i, report)
+            report = RF(i, report)
     except Exception as e:
         print(f"Ridge run failed: {e}")
 
     return report
-

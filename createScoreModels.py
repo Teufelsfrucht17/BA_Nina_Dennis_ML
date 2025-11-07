@@ -17,11 +17,20 @@ def runreports() -> pd.DataFrame:
     report = pd.concat([report, ridge_report], ignore_index=True)
 
     from RandomForest import Run_RandomForest
-
     RF = Run_RandomForest()
     report = pd.concat([report, RF], ignore_index=True)
+
+    from NeuralNetworksPytorch import runNN
+    rnn = runNN()
+    report = pd.concat([report, rnn], ignore_index=True)
+
     return report
 
 
+
+
 if __name__ == "__main__":
-    print(runreports().head())
+   df = runreports()
+   df.to_excel("scoreModels.xlsx")
+   print(df.head())
+

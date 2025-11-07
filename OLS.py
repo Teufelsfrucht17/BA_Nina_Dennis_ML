@@ -57,4 +57,3 @@ def runOLS() -> pd.DataFrame:
     return report
 
 
-runOLS()

@@ -12,6 +12,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 import GloablVariableStorage
 from Dataprep2 import finalrunner
+from createScoreModels import createscore
 
 
 class SimpleNet(nn.Module):
@@ -400,7 +401,7 @@ def train_model(
     return metrics
 
 
-def main(sheet:int | None):
+def main(sheet:int | None,report: pd.DataFrame | None = None)->pd.DataFrame:
     parser = argparse.ArgumentParser(description="Train simples PyTorch-Netz auf X/Y aus Dataprep2")
     parser.add_argument("--sheet", type=int, default=sheet, help="Sheet-Index für das Wertpapier (Default: 3)")
     parser.add_argument("--epochs", type=int, default=300, help="Anzahl maximaler Epochen (Default: 300)")
@@ -409,10 +410,10 @@ def main(sheet:int | None):
     parser.add_argument("--weight_decay", type=float, default=0.0, help="L2-Regularisierung/Weight Decay (Default: 0)")
     parser.add_argument("--patience", type=int, default=20, help="Frühes Stoppen nach X erfolglosen Validierungs-Epochen (Default: 20)")
     parser.add_argument("--min_delta", type=float, default=0.0, help="Minimaler Validierungsverlust-Rückgang für Verbesserung (Default: 0)")
-    parser.add_argument("--model_out", type=str, default=str("data_output/simple_net"+str(sheet)+".pt"), help="Pfad zum Speichern des Modells")
+    parser.add_argument("--model_out", type=str, default=str("data_output/NN/simple_net"+str(sheet)+".pt"), help="Pfad zum Speichern des Modells")
 
     args = parser.parse_args()
-    train_model(
+    metric = train_model(
         sheet=args.sheet,
         epochs=args.epochs,
         batch_size=args.batch_size,
@@ -422,11 +423,23 @@ def main(sheet:int | None):
         min_delta=args.min_delta,
         model_out=args.model_out,
     )
+    report.loc[len(report)] = [
+        "Neural Network",
+        sheet,
+        metric["train_r2"],
+        metric["val_r2"],
+        metric["best_epoch"],
+        "N/A",
+    ]
+    return report
 
 
-if __name__ == "__main__":
+def runNN()->pd.DataFrame:
+    report = createscore()
     try:
         for i in range(len(GloablVariableStorage.Portfolio)):
-            main(i)
+            report = main(i, report)
     except Exception as e:
         print(f"Ridge run failed: {e}")
+
+    return report
