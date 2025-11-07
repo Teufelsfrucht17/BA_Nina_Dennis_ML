@@ -6,11 +6,20 @@ def createscore() -> pd.DataFrame:
 
 
 def runreports() -> pd.DataFrame:
-    from RidgeRegession import runRidgeRegession  # lazy import avoids circular dependency
-
     report = createscore()
+
+    from OLS import runOLS
+    OLS = runOLS()
+    report = pd.concat([report, OLS], ignore_index=True)
+
+    from RidgeRegession import runRidgeRegession
     ridge_report = runRidgeRegession()
     report = pd.concat([report, ridge_report], ignore_index=True)
+
+    from RandomForest import Run_RandomForest
+
+    RF = Run_RandomForest()
+    report = pd.concat([report, RF], ignore_index=True)
     return report
 
 

@@ -5,11 +5,13 @@ from pathlib import Path
 
 import joblib
 import numpy as np
+import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 
 import GloablVariableStorage
 from Dataprep2 import finalrunner
+from createScoreModels import createscore
 
 
 def load_xy(sheet: int):
@@ -97,7 +99,7 @@ def train_random_forest(
     return metrics
 
 
-def main(sheet: int | None ):
+def main(sheet: int | None, report: pd.DataFrame | None = None ) -> pd.DataFrame:
     parser = argparse.ArgumentParser(description="RandomForest-Regressor auf Dataprep2-Daten trainen")
     parser.add_argument("--sheet", type=int, default=sheet, help="Sheet-Index (Default: 3)")
     parser.add_argument("--val_split", type=float, default=0.2, help="Anteil Validierung (Default: 0.2)")
@@ -113,7 +115,7 @@ def main(sheet: int | None ):
     )
 
     args = parser.parse_args()
-    train_random_forest(
+    metric =train_random_forest(
         sheet=args.sheet,
         val_split=args.val_split,
         n_estimators=args.n_estimators,
@@ -123,11 +125,24 @@ def main(sheet: int | None ):
         model_out=args.model_out,
     )
 
+    report.loc[len(report)] = [
+        "Ridge",
+        sheet,
+        metric["train_r2"],
+        metric["val_r2"],
+        metric[""],
+        "N/A",
+    ]
+    return report
 
-if __name__ == "__main__":
+
+def Run_RandomForest() -> pd.DataFrame:
+    report = createscore()
     try:
         for i in range(len(GloablVariableStorage.Portfolio)):
-            main(i)
+            report = main(i, report)
     except Exception as e:
         print(f"Ridge run failed: {e}")
+
+    return report
 

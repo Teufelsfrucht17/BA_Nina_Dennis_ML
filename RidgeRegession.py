@@ -51,7 +51,7 @@ def ridge_classification(sheet_index: int, report: pd.DataFrame | None = None) -
         sheet_index,
         acc_train,
         acc_test,
-        grid.best_params_,
+        grid.best_params_['model__alpha'],
         f"ridge_classification(sheet_index={sheet_index})",
     ]
     return report
