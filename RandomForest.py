@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import GridSearchCV
 
 import GloablVariableStorage
 from Dataprep2 import finalrunner
@@ -46,27 +47,29 @@ def time_series_split(X: np.ndarray, y: np.ndarray, val_split: float):
 def train_random_forest(
     sheet: int,
     val_split: float,
-    n_estimators: int,
-    max_depth: int | None,
-    min_samples_leaf: int,
-    random_state: int,
     model_out: Path,
 ):
+    param_grid = {
+        'max_depth': [4, 5, 6, 7, 8],
+     #   'n_estimators': [10, 50, 100, 150, 200],
+        'criterion': ['squared_error', 'absolute_error'],
+     #   'max_features': ['auto', 'sqrt', 'log2'],
+      #  'min_samples_split': [2, 3, 4, 5],
+       # 'min_samples_leaf': [2, 3, 4, 5],
+      #  'bootstrap': [True, False],
+    }
+
+
     X, y, feature_names = load_xy(sheet)
     X_train, X_val, y_train, y_val = time_series_split(X, y, val_split)
-    parm_grid = {   }
-    reg = RandomForestRegressor(
-        n_estimators=n_estimators,
-        max_depth=max_depth,
-        min_samples_leaf=min_samples_leaf,
-        n_jobs=-1,
-        random_state=random_state,
-    )
 
-    reg.fit(X_train, y_train)
+    reg = RandomForestRegressor(random_state=42)
+    regGS = GridSearchCV(estimator=reg,param_grid=param_grid,cv=4,n_jobs=-1)
+    regGS.fit(X_train, y_train)
 
-    y_train_pred = reg.predict(X_train)
-    y_val_pred = reg.predict(X_val)
+
+    y_train_pred = regGS.predict(X_train)
+    y_val_pred = regGS.predict(X_val)
 
     train_mse = mean_squared_error(y_train, y_train_pred)
     val_mse = mean_squared_error(y_val, y_val_pred) if len(y_val) else float("nan")
@@ -88,7 +91,7 @@ def train_random_forest(
     model_out.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(
         {
-            "model": reg,
+            "model": regGS,
             "feature_names": feature_names,
             "sheet": sheet,
             "metrics": metrics,
@@ -107,10 +110,6 @@ def RF(sheet: int | None, report: pd.DataFrame | None = None) -> pd.DataFrame:
     parser = argparse.ArgumentParser(description="RandomForest-Regressor auf Dataprep2-Daten trainen")
     parser.add_argument("--sheet", type=int, default=sheet, help="Sheet-Index (Default: 3)")
     parser.add_argument("--val_split", type=float, default=0.2, help="Anteil Validierung (Default: 0.2)")
-    parser.add_argument("--n_estimators", type=int, default=500, help="Anzahl Bäume (Default: 500)")
-    parser.add_argument("--max_depth", type=int, default=None, help="Maximale Tiefe (Default: None)")
-    parser.add_argument("--min_samples_leaf", type=int, default=5, help="Min. Samples pro Blatt (Default: 5)")
-    parser.add_argument("--random_state", type=int, default=42, help="Random-State (Default: 42)")
     parser.add_argument(
         "--model_out",
         type=Path,
@@ -122,10 +121,6 @@ def RF(sheet: int | None, report: pd.DataFrame | None = None) -> pd.DataFrame:
     metrics = train_random_forest(
         sheet=args.sheet,
         val_split=args.val_split,
-        n_estimators=args.n_estimators,
-        max_depth=args.max_depth,
-        min_samples_leaf=args.min_samples_leaf,
-        random_state=args.random_state,
         model_out=args.model_out,
     )
 
@@ -149,3 +144,5 @@ def Run_RandomForest() -> pd.DataFrame:
         print(f"Ridge run failed: {e}")
 
     return report
+
+Run_RandomForest()
