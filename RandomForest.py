@@ -51,11 +51,10 @@ def train_random_forest(
 ):
     param_grid = {
         'max_depth': [4, 5, 6, 7, 8],
-     #   'n_estimators': [10, 50, 100, 150, 200],
-        'criterion': ['squared_error', 'absolute_error'],
-     #   'max_features': ['auto', 'sqrt', 'log2'],
-      #  'min_samples_split': [2, 3, 4, 5],
-       # 'min_samples_leaf': [2, 3, 4, 5],
+        'n_estimators': [10, 50, 100, 150, 200],
+        'criterion': ['squared_error'],
+        'min_samples_split': [2, 3, 4, 5],
+        'min_samples_leaf': [2, 3, 4, 5],
       #  'bootstrap': [True, False],
     }
 
