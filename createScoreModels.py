@@ -5,32 +5,31 @@ def createscore() -> pd.DataFrame:
     return pd.DataFrame(columns=["Model", "Sheet", "R2.Train", "R2.Test", "Parameter", "Notes"])
 
 
+def _append(report: pd.DataFrame, addition: pd.DataFrame | None) -> pd.DataFrame:
+    if addition is not None and not addition.empty:
+        report = pd.concat([report, addition], ignore_index=True)
+    return report
+
+
 def runreports() -> pd.DataFrame:
     report = createscore()
 
     from OLS import runOLS
-    OLS = runOLS()
-    report = pd.concat([report, OLS], ignore_index=True)
+    report = _append(report, runOLS())
 
     from RidgeRegession import runRidgeRegession
-    ridge_report = runRidgeRegession()
-    report = pd.concat([report, ridge_report], ignore_index=True)
+    report = _append(report, runRidgeRegession())
 
     from RandomForest import Run_RandomForest
-    RF = Run_RandomForest()
-    report = pd.concat([report, RF], ignore_index=True)
+    report = _append(report, Run_RandomForest())
 
     from NeuralNetworksPytorch import runNN
-    rnn = runNN()
-    report = pd.concat([report, rnn], ignore_index=True)
+    report = _append(report, runNN())
 
     return report
 
 
-
-
 if __name__ == "__main__":
-   df = runreports()
-   df.to_excel("scoreModels.xlsx")
-   print(df.head())
-
+    df = runreports()
+    df.to_excel("scoreModels.xlsx", index=False)
+    print(df.head())

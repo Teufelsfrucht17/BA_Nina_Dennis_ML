@@ -1,4 +1,5 @@
 import pandas as pd
+from pandas.core.common import random_state
 
 import DataPreperation
 import Dataprep2
@@ -12,10 +13,10 @@ from createScoreModels import createscore
 
 
 def OLSRegression(sheet:int,report:pd.DataFrame) -> pd.DataFrame:
-    X,Y = Dataprep2.finalrunner(sheet)
 
 
-    X_train_OLS, X_test_OLS, Y_train_OLS, Y_test_OLS = train_test_split(X,Y, test_size=0.2, random_state=42)
+
+    X_train_OLS, X_test_OLS, Y_train_OLS, Y_test_OLS = Dataprep2.finalrunner(sheet)
 
     param_grid = {'fit_intercept': [True, False]}
     # Set model specs

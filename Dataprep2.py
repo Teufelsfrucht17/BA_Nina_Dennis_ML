@@ -157,13 +157,31 @@ def splitdataXY(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     X = df[X_cols].copy()
     return X, Y
 
+def time_series_split(X: np.ndarray, y: np.ndarray):
+    """Chronologischer Split: frühe Daten -> Training, späte -> Validation."""
+    val_split = 0.2
+    n_samples = X.shape[0]
+    if n_samples == 0:
+        raise ValueError("Keine Datenpunkte vorhanden.")
 
-def finalrunner(sheet:int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    val_size = int(n_samples * val_split)
+    train_size = n_samples - val_size
+    if train_size <= 0:
+        raise ValueError("Trainingssplit ergibt keine Trainingsdaten. val_split anpassen.")
+
+    X_train = X[:train_size]
+    X_val = X[train_size:]
+    y_train = y[:train_size]
+    y_val = y[train_size:]
+    return X_train, X_val, y_train, y_val
+
+def finalrunner(sheet:int):
     try:
      testvar = runningcycle(sheet)
      X, Y = splitdataXY(testvar)
+     X_train, X_val, y_train, y_val = time_series_split(X, Y)
     # print(testvar.head())
-     return X, Y
+     return X_train, X_val, y_train, y_val
     except Exception as e:
         print(f"Fehler beim Verarbeiten: {e}")
 

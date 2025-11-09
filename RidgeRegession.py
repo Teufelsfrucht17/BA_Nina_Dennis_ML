@@ -12,14 +12,9 @@ from createScoreModels import createscore
 
 def ridge_classification(sheet_index: int, report: pd.DataFrame | None = None) -> pd.DataFrame:
     """Train a Ridge model on one sheet and append metrics to the report."""
-    if report is None:
-        report = createscore()
 
-    X, Y = Dataprep2.finalrunner(sheet_index)
+    X_train, X_test, y_train, y_test = Dataprep2.finalrunner(sheet_index)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, Y, test_size=0.2, random_state=42,
-    )
 
     pipe = Pipeline([("scaler", StandardScaler()), ("model", Ridge())])
     param_grid = {

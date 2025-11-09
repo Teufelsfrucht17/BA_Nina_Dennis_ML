@@ -32,43 +32,35 @@ class SimpleNet(nn.Module):
         return self.net(x)
 
 
-def load_xy(sheet: int) -> tuple[torch.Tensor, torch.Tensor, list[str]]:
-    """Lädt X, Y aus Dataprep2.finalrunner(sheet) und konvertiert zu Tensoren.
+def load_xy(sheet: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, list[str]]:
+    """Lädt Dataprep2-Splits und gibt sie als Tensors zurück."""
+    X_train_df, X_val_df, y_train_df, y_val_df = finalrunner(sheet)
 
-    Die Helper aus Dataprep2 haben zuletzt X und Y vertauscht. Wir prüfen daher
-    die Spaltennamen und drehen die Rückgabe bei Bedarf zurück. Zusätzlich
-    liefern wir die Feature-Namen für Logging/Serialisierung.
-    """
-    X_df, Y_df = finalrunner(sheet)
+    if not isinstance(X_train_df, pd.DataFrame):
+        X_train_df = pd.DataFrame(X_train_df)
+    if X_val_df is None or len(X_val_df) == 0:
+        X_val_df = pd.DataFrame(columns=X_train_df.columns)
+    if not isinstance(X_val_df, pd.DataFrame):
+        X_val_df = pd.DataFrame(X_val_df, columns=X_train_df.columns)
 
-    def _normalize(cols: list[str]) -> set[str]:
-        return {c.lower() for c in cols}
+    if not isinstance(y_train_df, pd.DataFrame):
+        y_train_df = pd.DataFrame(y_train_df)
+    if y_val_df is None or len(y_val_df) == 0:
+        y_val_df = pd.DataFrame(columns=y_train_df.columns)
+    if not isinstance(y_val_df, pd.DataFrame):
+        y_val_df = pd.DataFrame(y_val_df, columns=y_train_df.columns)
 
-    feature_cols = {"momentum", "change_dax", "change_vdax"}
-    target_cols = {"change"}
+    feature_names = list(X_train_df.columns)
 
-    x_cols = _normalize(list(X_df.columns))
-    y_cols = _normalize(list(Y_df.columns))
+    def _to_tensor(df: pd.DataFrame) -> torch.Tensor:
+        return torch.tensor(df.values, dtype=torch.float32)
 
-    x_has_features = feature_cols.issubset(x_cols)
-    y_has_target = target_cols.issubset(y_cols)
+    X_train = _to_tensor(X_train_df)
+    X_val = _to_tensor(X_val_df) if len(X_val_df) else torch.zeros((0, X_train.shape[1]), dtype=torch.float32)
+    y_train = _to_tensor(y_train_df)
+    y_val = _to_tensor(y_val_df) if len(y_val_df) else torch.zeros((0, y_train.shape[1]), dtype=torch.float32)
 
-    if not (x_has_features and y_has_target):
-        swapped_x_has_features = feature_cols.issubset(y_cols)
-        swapped_y_has_target = target_cols.issubset(x_cols)
-        if swapped_x_has_features and swapped_y_has_target:
-            X_df, Y_df = Y_df, X_df
-            x_cols, y_cols = y_cols, x_cols
-        else:
-            raise ValueError(
-                "Dataprep2.finalrunner liefert unerwartete Spalten: "
-                f"X={list(X_df.columns)}, Y={list(Y_df.columns)}"
-            )
-
-    X_t = torch.tensor(X_df.values, dtype=torch.float32)
-    Y_t = torch.tensor(Y_df.values, dtype=torch.float32)
-
-    return X_t, Y_t, list(X_df.columns)
+    return X_train, X_val, y_train, y_val, feature_names
 
 
 def _r2_score(y_true: torch.Tensor, y_pred: torch.Tensor) -> float:
@@ -184,7 +176,6 @@ def train_model(
     epochs: int = 300,
     batch_size: int = 32,
     lr: float = 1e-3,
-    val_split: float = 0.2,
     weight_decay: float = 0.0,
     patience: int = 20,
     min_delta: float = 0.0,
@@ -209,33 +200,25 @@ def train_model(
         torch.backends.cudnn.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
 
-    # Daten laden
-    X, Y, feature_names = load_xy(sheet)
-    n_samples = X.shape[0]
-
-    # Chronologischer Train/Val-Split (keine Zufallsdurchmischung)
-    val_size = int(n_samples * val_split)
-    train_size = n_samples - val_size
+    # Daten laden (inkl. Time-Series-Split aus Dataprep2)
+    X_train, X_val, Y_train, Y_val, feature_names = load_xy(sheet)
+    train_size = X_train.shape[0]
+    val_size = X_val.shape[0]
 
     if train_size <= 0:
-        raise ValueError("Trainingssplit ergibt keine Trainingsdaten. val_split zu groß?")
+        raise ValueError("Dataprep2.finalrunner lieferte keine Trainingsdaten.")
 
-    # Feature-Standardisierung nach Trainingsschnitt
-    train_slice = slice(0, train_size)
-    train_mean = X[train_slice].mean(dim=0, keepdim=True)
-    train_std = X[train_slice].std(dim=0, keepdim=True, unbiased=False).clamp_min(1e-8)
-    X = (X - train_mean) / train_std
-
-    dataset = TensorDataset(X, Y)
-
+    train_mean = X_train.mean(dim=0, keepdim=True)
+    train_std = X_train.std(dim=0, keepdim=True, unbiased=False).clamp_min(1e-8)
+    X_train = (X_train - train_mean) / train_std
     if val_size > 0:
-        train_indices = torch.arange(0, train_size)
-        val_indices = torch.arange(train_size, n_samples)
-        train_ds = torch.utils.data.Subset(dataset, train_indices.tolist())
-        val_ds = torch.utils.data.Subset(dataset, val_indices.tolist())
+        X_val = (X_val - train_mean) / train_std
     else:
-        train_ds = dataset
-        val_ds = None
+        X_val = torch.zeros((0, X_train.shape[1]), dtype=torch.float32)
+        Y_val = torch.zeros((0, Y_train.shape[1]), dtype=torch.float32)
+
+    train_ds = TensorDataset(X_train, Y_train)
+    val_ds = TensorDataset(X_val, Y_val) if val_size > 0 else None
 
     # DataLoader mit CUDA-optimierten Parametern
     num_workers = min(4, os.cpu_count() or 0)
@@ -252,7 +235,7 @@ def train_model(
     )
 
     # Modell + Optimierer
-    model = SimpleNet(in_features=X.shape[1], out_features=Y.shape[1])
+    model = SimpleNet(in_features=X_train.shape[1], out_features=Y_train.shape[1])
     model = model.to(device)
     if device.type == "cuda" and torch.cuda.device_count() > 1:
         print(f"DataParallel aktiv: {torch.cuda.device_count()} GPUs")
@@ -386,8 +369,8 @@ def train_model(
 
     torch.save({
         "state_dict": _unwrap_model(model).state_dict(),
-        "in_features": X.shape[1],
-        "out_features": Y.shape[1],
+        "in_features": X_train.shape[1],
+        "out_features": Y_train.shape[1],
         "hidden1": 32,
         "hidden2": 16,
         "sheet": sheet,
@@ -401,27 +384,31 @@ def train_model(
     return metrics
 
 
-def main(sheet:int | None,report: pd.DataFrame | None = None)->pd.DataFrame:
-    parser = argparse.ArgumentParser(description="Train simples PyTorch-Netz auf X/Y aus Dataprep2")
-    parser.add_argument("--sheet", type=int, default=sheet, help="Sheet-Index für das Wertpapier (Default: 3)")
-    parser.add_argument("--epochs", type=int, default=300, help="Anzahl maximaler Epochen (Default: 300)")
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch-Größe (Default: 32)")
-    parser.add_argument("--lr", type=float, default=1e-3, help="Lernrate (Default: 1e-3)")
-    parser.add_argument("--weight_decay", type=float, default=0.0, help="L2-Regularisierung/Weight Decay (Default: 0)")
-    parser.add_argument("--patience", type=int, default=20, help="Frühes Stoppen nach X erfolglosen Validierungs-Epochen (Default: 20)")
-    parser.add_argument("--min_delta", type=float, default=0.0, help="Minimaler Validierungsverlust-Rückgang für Verbesserung (Default: 0)")
-    parser.add_argument("--model_out", type=str, default=str("data_output/NN/simple_net"+str(sheet)+".pt"), help="Pfad zum Speichern des Modells")
+def main(
+    sheet: int,
+    report: pd.DataFrame | None = None,
+    *,
+    epochs: int = 300,
+    batch_size: int = 32,
+    lr: float = 1e-3,
+    weight_decay: float = 0.0,
+    patience: int = 20,
+    min_delta: float = 0.0,
+    model_out: str | Path | None = None,
+) -> pd.DataFrame:
+    if report is None:
+        report = createscore()
 
-    args = parser.parse_args()
+    model_path = model_out or str(Path("data_output/NN") / f"simple_net{sheet}.pt")
     metric = train_model(
-        sheet=args.sheet,
-        epochs=args.epochs,
-        batch_size=args.batch_size,
-        lr=args.lr,
-        weight_decay=args.weight_decay,
-        patience=args.patience,
-        min_delta=args.min_delta,
-        model_out=args.model_out,
+        sheet=sheet,
+        epochs=epochs,
+        batch_size=batch_size,
+        lr=lr,
+        weight_decay=weight_decay,
+        patience=patience,
+        min_delta=min_delta,
+        model_out=model_path,
     )
     report.loc[len(report)] = [
         "Neural Network",
@@ -434,12 +421,38 @@ def main(sheet:int | None,report: pd.DataFrame | None = None)->pd.DataFrame:
     return report
 
 
-def runNN()->pd.DataFrame:
+def runNN() -> pd.DataFrame:
     report = createscore()
     try:
         for i in range(len(GloablVariableStorage.Portfolio)):
             report = main(i, report)
     except Exception as e:
-        print(f"Ridge run failed: {e}")
+        print(f"NN run failed: {e}")
 
     return report
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Train simples PyTorch-Netz auf X/Y aus Dataprep2")
+    parser.add_argument("--sheet", type=int, default=3, help="Sheet-Index für das Wertpapier")
+    parser.add_argument("--epochs", type=int, default=300, help="Anzahl maximaler Epochen")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch-Größe")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Lernrate")
+    parser.add_argument("--weight_decay", type=float, default=0.0, help="L2-Regularisierung/Weight Decay")
+    parser.add_argument("--patience", type=int, default=20, help="Frühes Stoppen nach X erfolglosen Validierungs-Epochen")
+    parser.add_argument("--min_delta", type=float, default=0.0, help="Minimaler Validierungsverlust-Rückgang für Verbesserung")
+    parser.add_argument("--model_out", type=str, default=None, help="Pfad zum Speichern des Modells")
+    cli_args = parser.parse_args()
+
+    model_path = cli_args.model_out or str(Path("data_output/NN") / f"simple_net{cli_args.sheet}.pt")
+    result = main(
+        sheet=cli_args.sheet,
+        report=createscore(),
+        epochs=cli_args.epochs,
+        batch_size=cli_args.batch_size,
+        lr=cli_args.lr,
+        weight_decay=cli_args.weight_decay,
+        patience=cli_args.patience,
+        min_delta=cli_args.min_delta,
+        model_out=model_path,
+    )
+    print(result.tail(1))
