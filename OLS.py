@@ -1,3 +1,4 @@
+import joblib
 import pandas as pd
 from pandas.core.common import random_state
 
@@ -42,8 +43,14 @@ def OLSRegression(sheet:int,report:pd.DataFrame) -> pd.DataFrame:
         CV_olsmodel.best_params_['fit_intercept'],
         "N/A",
     ]
+    payload = {
+        "model": CV_olsmodel.best_estimator_,
+        "feature_names": list(X_train_OLS.columns),
+        "sheet": sheet,
+        "best_params": CV_olsmodel.best_params_,
+    }
+    joblib.dump(payload, "./data_output/OLS/OLSModel"+str(sheet)+".pkl")
     return report
-
 
 def runOLS() -> pd.DataFrame:
 
@@ -57,4 +64,4 @@ def runOLS() -> pd.DataFrame:
 
     return report
 
-
+runOLS()

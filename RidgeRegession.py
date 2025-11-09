@@ -1,3 +1,4 @@
+import joblib
 import pandas as pd
 from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
@@ -49,6 +50,8 @@ def ridge_classification(sheet_index: int, report: pd.DataFrame | None = None) -
         grid.best_params_['model__alpha'],
         f"ridge_classification(sheet_index={sheet_index})",
     ]
+    joblib.dump(grid, "./data_output/RR/OLSModel" + str(sheet_index) + ".pkl")
+
     return report
 
 
@@ -62,3 +65,4 @@ def runRidgeRegession() -> pd.DataFrame:
         print(f"Ridge run failed: {e}")
 
     return report
+
