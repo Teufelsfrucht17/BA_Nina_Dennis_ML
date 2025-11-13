@@ -26,6 +26,9 @@ def runreports() -> pd.DataFrame:
     from NeuralNetworksPytorch import runNN
     report = _append(report, runNN())
 
+    from NeuralNetworkSklearn import run_all_sheets
+    report = _append(report, run_all_sheets())
+
     return report
 
 
