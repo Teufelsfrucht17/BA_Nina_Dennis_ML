@@ -57,6 +57,7 @@ def price_plus_minus(df: pd.DataFrame) -> pd.DataFrame:
    # print(out.head())
     return out
 
+# Anpassung: Momentum nur aus Vergangenheitsinformationen ableiten.
 def createmomentum(
     df: pd.DataFrame,
     window: int,
@@ -64,7 +65,7 @@ def createmomentum(
     """Fügt eine Momentum-Spalte hinzu (periodenbasiert, nur int-Window).
 
     Definition:
-    momentum_t = Price_t / Price_{t-window} - 1
+    momentum_t = Price_{t-1} / Price_{t-1-window} - 1
 
     Parameter:
     - window: Anzahl Perioden (z. B. 60)
@@ -81,32 +82,34 @@ def createmomentum(
     # Price numerisch sicherstellen
     out["Price"] = pd.to_numeric(out["Price"], errors="coerce")
 
-    # Periodenbasiertes Momentum
-    out["momentum"] = out["Price"].pct_change(periods=window)
+    # Periodenbasiertes Momentum ausschließlich aus Preisen bis einschließlich t-1
+    lagged_price = out["Price"].shift(1)
+    out["momentum"] = lagged_price.pct_change(periods=window)
     out = out.dropna(how="any")
    # print(out.head())
     return out
 
 
+# Anpassung: Future-Return erzeugen und sämtliche Features auf Vergangenheitswerte begrenzen.
 def runningcycle(sheetstock:int) -> pd.DataFrame:
-    try:
-        df = Excelloader("DataStorage/Portfolio.xlsx", sheetstock)
-        df = price_plus_minus(df)
-        df = createmomentum(df, 30)
-        df = df.drop(columns=["Price"])
-        df1 = Excelloader("DataStorage/INDEX.xlsx", 1)
-        df1 = price_plus_minus(df1)
-        df1 = df1[["Date", "change"]].copy()
-        df1 = df1.rename(columns={"Date": "Date", "change": "change_DAX"})
-        df = df.merge(df1, how="inner", on="Date")
-        df1 = Excelloader("DataStorage/INDEX.xlsx", 0)
-        df1 = price_plus_minus(df1)
-        df1 = df1[["Date", "change"]].copy()
-        df1 = df1.rename(columns={"Date": "Date", "change": "change_VDAX"})
-        df = df.merge(df1, how="inner", on="Date")
-      #  print(df.head())
-    except Exception as e:
-        print(f"Fehler beim Verarbeiten: {e}")
+    """Compile the modelling frame with lagged-only inputs for forecasting."""
+
+    df = Excelloader("DataStorage/Portfolio.xlsx", sheetstock)
+    df = price_plus_minus(df)
+    df = createmomentum(df, 30)
+    df = df.drop(columns=["Price"])
+
+    # Externe Märkte laden und auf vergangene Informationen begrenzen
+    dax = Excelloader("DataStorage/INDEX.xlsx", 1)
+    dax = price_plus_minus(dax)
+    dax = dax[["Date", "change"]].rename(columns={"change": "change_DAX"})
+
+    vdax = Excelloader("DataStorage/INDEX.xlsx", 0)
+    vdax = price_plus_minus(vdax)
+    vdax = vdax[["Date", "change"]].rename(columns={"change": "change_VDAX"})
+
+    df = df.merge(dax, how="inner", on="Date")
+    df = df.merge(vdax, how="inner", on="Date")
     # Nach dem Mergen sicherheitshalber nach Datum sortieren
     if "Date" in df.columns:
         df = df.sort_values("Date").reset_index(drop=True)
@@ -119,23 +122,32 @@ def runningcycle(sheetstock:int) -> pd.DataFrame:
 
     df["momentum_lag1"] = df["momentum"].shift(1)
 
-    for col in ("change_DAX", "change_VDAX"):
-        base = col.lower() if col in df.columns else col
-        if col not in df.columns and base not in df.columns:
+    df.rename(
+        columns={
+            "change_DAX": "change_dax",
+            "change_VDAX": "change_vdax",
+        },
+        inplace=True,
+    )
+    for col in ("change_dax", "change_vdax"):
+        if col not in df.columns:
             continue
-        series_name = col if col in df.columns else base
-        df[f"{series_name.lower()}_lag1"] = df[series_name].shift(1)
-        df[f"{series_name.lower()}_roll_mean5"] = df[series_name].shift(1).rolling(window=5).mean()
+        df[f"{col}_lag1"] = df[col].shift(1)
+        df[f"{col}_roll_mean5"] = df[col].shift(1).rolling(window=5).mean()
+
+    # Future-Return als Zielvariable für echtes Forecasting nutzen
+    df["change_future"] = df["change"].shift(-1)
 
     df = df.dropna(how="any").reset_index(drop=True)
     return df
 
 
+# Anpassung: Zielvariable auf zukünftigen Return verschoben und gleichzeitige Index-Informationen entfernt.
 def splitdataXY(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Teilt df in Featurematrix X und Ziel Y.
 
-    'change' bleibt als Target, alle übrigen Spalten (außer Datum) bilden X.
-    Groß-/Kleinschreibung bei DAX/VDAX wird harmonisiert.
+    'change_future' dient als Target, alle übrigen Spalten (außer Datum und
+    unverzögerte Index-Renditen) bilden X.
     """
     df = df.copy()
     # Toleranz für Groß-/Kleinschreibung bei DAX/VDAX
@@ -144,15 +156,18 @@ def splitdataXY(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         "change_VDAX": "change_vdax",
     }, inplace=True)
 
-    required = ["change", "momentum", "change_dax", "change_vdax"]
+    if "change_future" not in df.columns:
+        raise ValueError("'change_future' fehlt in den Daten. runningcycle zuerst aufrufen.")
+
+    required = ["change", "momentum", "change_future"]
     missing = [c for c in required if c not in df.columns]
     if missing:
         raise ValueError(f"Fehlende Spalten: {missing}. Vorhanden: {list(df.columns)}")
 
-    Y = df[["change"]].copy()
+    Y = df[["change_future"]].copy()
 
     # Alle Features außer Ziel und Datum verwenden
-    drop_cols = {"change", "Date", "date"}
+    drop_cols = {"change", "change_future", "Date", "date", "change_dax", "change_vdax"}
     X_cols = [c for c in df.columns if c not in drop_cols]
     X = df[X_cols].copy()
     return X, Y
@@ -175,17 +190,11 @@ def time_series_split(X: np.ndarray, y: np.ndarray):
     y_val = y[train_size:]
     return X_train, X_val, y_train, y_val
 
+# finalrunner nutzt nun change_future als Y, behält aber das bestehende Rückgabeformat bei.
 def finalrunner(sheet:int):
-    try:
-     testvar = runningcycle(sheet)
-     X, Y = splitdataXY(testvar)
-     X_train, X_val, y_train, y_val = time_series_split(X, Y)
-    # print(testvar.head())
-     return X_train, X_val, y_train, y_val
-    except Exception as e:
-        print(f"Fehler beim Verarbeiten: {e}")
+    """Return train/validation splits with change_future as the target."""
 
-
-
-
-finalrunner(3)
+    dataset = runningcycle(sheet)
+    X, Y = splitdataXY(dataset)
+    X_train, X_val, y_train, y_val = time_series_split(X, Y)
+    return X_train, X_val, y_train, y_val
