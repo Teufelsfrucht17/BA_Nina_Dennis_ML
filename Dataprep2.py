@@ -114,8 +114,8 @@ def runningcycle(sheetstock:int) -> pd.DataFrame:
     # Zusätzliche abgeleitete Features
     df["change_lag1"] = df["change"].shift(1)
     df["change_lag5"] = df["change"].shift(5)
-    df["change_roll_mean5"] = df["change"].rolling(window=5).mean()
-    df["change_roll_std5"] = df["change"].rolling(window=5).std()
+    df["change_roll_mean5"] = df["change"].shift(1).rolling(window=5).mean()
+    df["change_roll_std5"] = df["change"].shift(1).rolling(window=5).std()
 
     df["momentum_lag1"] = df["momentum"].shift(1)
 
@@ -125,7 +125,7 @@ def runningcycle(sheetstock:int) -> pd.DataFrame:
             continue
         series_name = col if col in df.columns else base
         df[f"{series_name.lower()}_lag1"] = df[series_name].shift(1)
-        df[f"{series_name.lower()}_roll_mean5"] = df[series_name].rolling(window=5).mean()
+        df[f"{series_name.lower()}_roll_mean5"] = df[series_name].shift(1).rolling(window=5).mean()
 
     df = df.dropna(how="any").reset_index(drop=True)
     return df

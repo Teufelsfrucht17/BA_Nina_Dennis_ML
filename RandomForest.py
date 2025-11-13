@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 
 import Dataprep2
 import GloablVariableStorage
@@ -36,7 +36,8 @@ def train_random_forest(
     X_train, X_val, y_train, y_val, feature_names = _split_data(sheet)
 
     reg = RandomForestRegressor(random_state=42, n_jobs=-1)
-    grid = GridSearchCV(reg, param_grid=param_grid, cv=3, n_jobs=-1)
+    tscv = TimeSeriesSplit(n_splits=5)
+    grid = GridSearchCV(reg, param_grid=param_grid, cv=tscv, n_jobs=-1)
     grid.fit(X_train, y_train.values.ravel())
 
     y_train_pred = grid.predict(X_train)

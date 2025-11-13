@@ -2,7 +2,7 @@ import joblib
 import pandas as pd
 from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
-from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -29,8 +29,15 @@ def ridge_classification(sheet_index: int, report: pd.DataFrame | None = None) -
         "model__tol": [1e-4, 1e-3],
         "model__max_iter": [5000],
     }
-    grid = GridSearchCV(pipe, param_grid=param_grid, cv=5, scoring="r2", n_jobs=-1)
-    grid.fit(X_train, y_train)
+    tscv = TimeSeriesSplit(n_splits=5)
+    grid = GridSearchCV(
+        pipe,
+        param_grid=param_grid,
+        cv=tscv,
+        scoring="r2",
+        n_jobs=-1,
+    )
+    grid.fit(X_train, y_train.values.ravel())
 
     y_train_pred = grid.predict(X_train)
     y_test_pred = grid.predict(X_test)

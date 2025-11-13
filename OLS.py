@@ -6,7 +6,7 @@ import DataPreperation
 import Dataprep2
 import GloablVariableStorage
 from DataPreperation import featuresplit, combine
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 
@@ -22,8 +22,14 @@ def OLSRegression(sheet:int,report:pd.DataFrame) -> pd.DataFrame:
     param_grid = {'fit_intercept': [True, False]}
     # Set model specs
     ols_model = LinearRegression()
-    CV_olsmodel = GridSearchCV(estimator=ols_model, param_grid=param_grid, cv=10,n_jobs=-1)
-    CV_olsmodel.fit(X_train_OLS, Y_train_OLS)
+    tscv = TimeSeriesSplit(n_splits=5)
+    CV_olsmodel = GridSearchCV(
+        estimator=ols_model,
+        param_grid=param_grid,
+        cv=tscv,
+        n_jobs=-1,
+    )
+    CV_olsmodel.fit(X_train_OLS, Y_train_OLS.values.ravel())
 
     # Prediction and result
     y_train_pred = CV_olsmodel.predict(X_train_OLS)
